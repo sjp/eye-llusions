@@ -1,13 +1,21 @@
 import { useEffect, useId, useRef } from "preact/hooks";
+import { FIGURES } from "../../core/depth/figure.ts";
 import { rasteriseSample } from "../../core/depth/sample.ts";
 import { defaultRecipe, type SampleLayer, type SampleShape } from "../../core/recipe.ts";
+import { figureUrl } from "../../render/figures.ts";
 import { Slider } from "../Slider.tsx";
 import type { LayerEditorProps } from "./kinds.ts";
 
-type ShapeType = SampleShape["type"];
+type ShapeType = Exclude<SampleShape["type"], "figure">;
+type ProceduralShape = Exclude<SampleShape, { type: "figure" }>;
+
+/** Tells shapes apart in the picker, figures by their picture. */
+function shapeKey(shape: SampleShape): string {
+  return shape.type === "figure" ? `figure:${shape.figure}` : shape.type;
+}
 
 /** Each shape with the parameters a new one starts with. */
-const SHAPES: readonly { shape: SampleShape; label: string }[] = [
+const PROCEDURAL: readonly { shape: ProceduralShape; label: string }[] = [
   { shape: { type: "sphere" }, label: "Sphere" },
   { shape: { type: "ripples", rings: 4 }, label: "Ripples" },
   { shape: { type: "pyramid", sides: 4 }, label: "Pyramid" },
@@ -15,11 +23,16 @@ const SHAPES: readonly { shape: SampleShape; label: string }[] = [
   { shape: { type: "spiralStairs", steps: 16, turns: 2 }, label: "Spiral stairs" },
 ];
 
+const SHAPES: readonly { shape: SampleShape; label: string }[] = [
+  ...PROCEDURAL,
+  ...FIGURES.map(({ id, label }) => ({ shape: { type: "figure", figure: id } as const, label })),
+];
+
 const THUMBNAIL_SIZE = 64;
 const thumbnails = new Map<ShapeType, ImageData>();
 
 /** A grey depth render of the shape, cached per shape type. */
-function thumbnail(shape: SampleShape): ImageData {
+function thumbnail(shape: ProceduralShape): ImageData {
   const cached = thumbnails.get(shape.type);
   if (cached !== undefined) {
     return cached;
@@ -47,7 +60,7 @@ function thumbnail(shape: SampleShape): ImageData {
   return image;
 }
 
-function ShapeThumbnail({ shape }: { shape: SampleShape }) {
+function ProceduralThumbnail({ shape }: { shape: ProceduralShape }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     ref.current?.getContext("2d")?.putImageData(thumbnail(shape), 0, 0);
@@ -63,11 +76,27 @@ function ShapeThumbnail({ shape }: { shape: SampleShape }) {
   );
 }
 
+function ShapeThumbnail({ shape }: { shape: SampleShape }) {
+  if (shape.type === "figure") {
+    return (
+      <img
+        class="shape-thumbnail"
+        src={figureUrl(shape.figure)}
+        width={THUMBNAIL_SIZE}
+        height={THUMBNAIL_SIZE}
+        alt=""
+        loading="lazy"
+      />
+    );
+  }
+  return <ProceduralThumbnail shape={shape} />;
+}
+
 function ShapePicker({
   value,
   onChange,
 }: {
-  value: ShapeType;
+  value: string;
   onChange: (shape: SampleShape) => void;
 }) {
   const name = useId();
@@ -76,12 +105,12 @@ function ShapePicker({
       <legend>Shape</legend>
       <div class="choice-options">
         {SHAPES.map(({ shape, label }) => (
-          <label key={shape.type}>
+          <label key={shapeKey(shape)}>
             <input
               type="radio"
               name={name}
-              value={shape.type}
-              checked={shape.type === value}
+              value={shapeKey(shape)}
+              checked={shapeKey(shape) === value}
               onChange={() => {
                 onChange(shape);
               }}
@@ -123,6 +152,7 @@ function ShapeSettings({ layer, change, commit }: LayerEditorProps<SampleLayer>)
   );
   switch (shape.type) {
     case "sphere":
+    case "figure":
       return null;
     case "ripples":
       return slider("rings", "Rings", [1, 32, 1], shape.rings, whole, (rings) => ({
@@ -170,7 +200,7 @@ export function SampleEditor(props: LayerEditorProps<SampleLayer>) {
   return (
     <>
       <ShapePicker
-        value={layer.shape.type}
+        value={shapeKey(layer.shape)}
         onChange={(shape) => {
           change({ shape });
         }}

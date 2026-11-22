@@ -1,11 +1,16 @@
 import { CORE_RASTERISERS } from "../core/depth/composite.ts";
 import type { Asset } from "../core/recipe.ts";
 import type { RasteriserRegistry } from "../core/depth/raster.ts";
+import { createSampleRasteriser } from "./figures.ts";
 import { renderPixels, restoreAssets } from "./pipeline.ts";
 import type { RenderRequest, RenderResponse } from "./protocol.ts";
 import { createTextRasteriser } from "./text.ts";
 
-const rasterisers: RasteriserRegistry = { ...CORE_RASTERISERS, text: createTextRasteriser() };
+const rasterisers: RasteriserRegistry = {
+  ...CORE_RASTERISERS,
+  sample: createSampleRasteriser(),
+  text: createTextRasteriser(),
+};
 
 const assets = new Map<string, Asset>();
 /** Reused while results go out as bitmaps, which copy it; ImageData results take it. */
