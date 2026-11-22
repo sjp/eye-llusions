@@ -54,6 +54,7 @@ h2 {
 }
 
 .toolbar {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -743,4 +744,87 @@ h2 {
 .palette-colour:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+.notice {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: max(12px, env(safe-area-inset-right));
+  left: max(12px, env(safe-area-inset-left));
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+.notice p {
+  flex: 1;
+  margin: 0;
+}
+
+.notice.error {
+  border-color: #ff9a9a;
+}
+
+.share-dialog {
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--fg);
+}
+
+.share-dialog[open] {
+  display: grid;
+  gap: 12px;
+}
+
+.share-dialog::backdrop {
+  background: rgb(0 0 0 / 60%);
+}
+
+.share-link {
+  display: grid;
+  gap: 4px;
+}
+
+.share-link input {
+  min-height: var(--target);
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+
+.share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.share-actions .button:last-child {
+  margin-left: auto;
+}
+
+@media (max-width: 767px) {
+  .toolbar h1 {
+    font-size: 1rem;
+  }
+
+  .toolbar-actions {
+    gap: 4px;
+  }
+
+  .toolbar-actions .button {
+    padding: 0 10px;
+  }
 }

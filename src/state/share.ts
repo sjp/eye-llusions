@@ -5,6 +5,8 @@ import { STROKE_GRID } from "../core/strokes.ts";
 /** Bumped whenever the link payload changes in a way old decoders can't read. */
 const LINK_FORMAT = 1;
 const HASH_PREFIX = "#r=";
+/** Links longer than this may be cut short by chat apps and mail clients. */
+export const LINK_LENGTH_WARNING = 8000;
 /** Caps on untrusted input, well above anything the editor can produce. */
 const MAX_PAYLOAD_CHARS = 4_000_000;
 const MAX_JSON_BYTES = 16 * 1024 * 1024;
