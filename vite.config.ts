@@ -58,14 +58,8 @@ const TEST_TIME = Date.UTC(2026, 2, 14, 15, 9, 26);
 /** Kept out of every Vitest run. */
 export const TEST_EXCLUDE = ["**/.claude/**", "e2e/**"];
 
-/**
- * `--mode e2e` adds pages that only the browser tests load. Build that mode into its own
- * folder so the extra pages never reach `dist/`.
- */
-const E2E_PAGES = { main: "index.html", render: "e2e/render.html" };
-
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig({
   // Relative base so the build works when served from a GitHub Pages
   // project subpath (https://<user>.github.io/<repo>/).
   base: "./",
@@ -75,7 +69,6 @@ export default defineConfig(({ mode }) => ({
   plugins: [preact({ reactAliasesEnabled: false }), contentSecurityPolicy()],
   // Module workers keep the render worker a single same-origin file.
   worker: { format: "es" },
-  ...(mode === "e2e" ? { build: { rolldownOptions: { input: E2E_PAGES } } } : {}),
   // Agent worktrees live under .claude/; keep their copies of the tests out of the run.
   // e2e/ is reserved for Playwright browser tests, and *.perf.test.ts holds the
   // frame-timing tests, run one file at a time by `npm run test:perf`.
@@ -86,4 +79,4 @@ export default defineConfig(({ mode }) => ({
     setupFiles: ["src/test/setup.ts"],
     fakeTimers: { now: TEST_TIME },
   },
-}));
+});

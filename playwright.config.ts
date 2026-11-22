@@ -3,7 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 /** Not Vite's default preview port, so a manual `npm run preview` doesn't clash. */
 const PORT = 4174;
 const CI = process.env["CI"] !== undefined;
-/** The e2e build adds test-only pages, so it stays out of the deployable `dist/`. */
+/** Built separately so a test run never replaces the deployable `dist/`. */
 const OUT_DIR = "dist-e2e";
 
 // The tests run against the production build, so they see the real CSP.
@@ -22,7 +22,7 @@ export default defineConfig({
     { name: "mobile-webkit", use: { ...devices["iPhone 15"] } },
   ],
   webServer: {
-    command: `npm run build -- --mode e2e --outDir ${OUT_DIR} && npx vite preview --outDir ${OUT_DIR} --port ${String(PORT)} --strictPort`,
+    command: `npm run build -- --outDir ${OUT_DIR} && npx vite preview --outDir ${OUT_DIR} --port ${String(PORT)} --strictPort`,
     url: `http://localhost:${String(PORT)}/`,
     reuseExistingServer: false,
     timeout: 180_000,
