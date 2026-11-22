@@ -90,10 +90,33 @@ h2 {
   overflow: hidden;
 }
 
+.preview-surface {
+  position: relative;
+  display: flex;
+  max-width: 100%;
+  max-height: 100%;
+}
+
 .preview-canvas {
   display: block;
   max-width: 100%;
   max-height: 100%;
+}
+
+.drawing-surface {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.drawing-surface[data-tool="move"] {
+  cursor: grab;
 }
 
 .preview-error {
@@ -277,11 +300,14 @@ h2 {
   padding: 0;
 }
 
-.stage > .segmented {
-  align-self: center;
+.stage-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
 }
 
-.stage > .segmented legend {
+.stage-bar .segmented legend {
   position: absolute;
   width: 1px;
   height: 1px;

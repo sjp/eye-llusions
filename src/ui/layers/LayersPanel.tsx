@@ -1,3 +1,4 @@
+import { useSignal, type Signal } from "@preact/signals";
 import { useId, useState } from "preact/hooks";
 import { RECIPE_LIMITS } from "../../core/parseRecipe.ts";
 import type { Layer } from "../../core/recipe.ts";
@@ -11,6 +12,7 @@ import {
   insertLayer,
   moveLayer,
   removeLayer,
+  selectedLayer,
 } from "../../state/layers.ts";
 import { Panel } from "../Panel.tsx";
 import { Slider } from "../Slider.tsx";
@@ -237,12 +239,23 @@ function LayerSettings({ editor, layer }: { editor: Editor; layer: Layer }) {
  * The layer stack, top layer first, with the selected layer's settings below it.
  * Layers reorder by dragging on desktop, or with the up and down buttons anywhere.
  */
-export function LayersPanel({ editor }: { editor: Editor }) {
+export function LayersPanel({
+  editor,
+  selection,
+}: {
+  editor: Editor;
+  /** The selected layer's ID, shared with the preview; kept locally if not given. */
+  selection?: Signal<string | undefined>;
+}) {
   const { layers } = editor.recipe.value;
-  const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
+  const local = useSignal<string | undefined>(undefined);
+  const selectedId = (selection ?? local).value;
+  const setSelectedId = (id: string | undefined): void => {
+    (selection ?? local).value = id;
+  };
   const [dragging, setDragging] = useState<string | undefined>(undefined);
   const [over, setOver] = useState<string | undefined>(undefined);
-  const selected = layers.find((layer) => layer.id === selectedId) ?? layers.at(-1);
+  const selected = selectedLayer(layers, selectedId);
   const roomy = canAddLayer(layers);
 
   const add = (kind: AddableKind): void => {

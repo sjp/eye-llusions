@@ -1,4 +1,5 @@
 import { effect } from "@preact/signals";
+import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { Recipe } from "../core/recipe.ts";
 import { isRenderAborted, type RenderClient, type RenderImage } from "../render/client.ts";
@@ -16,6 +17,12 @@ type Props = {
   editor: Editor;
   renderer: Renderer;
   output: RenderOutput;
+  /** A CSS transform for zooming and panning the picture. */
+  transform?: string | undefined;
+  /** Called with the recipe of each image as it is shown. */
+  onShown?: (recipe: Recipe) => void;
+  /** Laid over the picture, at its size, and transformed with it. */
+  children?: ComponentChildren;
 };
 
 /** The largest CSS size with the given aspect that fits the box. */
@@ -40,13 +47,13 @@ function draw(canvas: HTMLCanvasElement, image: RenderImage): void {
  * The recipe rendered to fit its container at the device pixel ratio: drafts while an
  * edit such as a slider drag is under way, then a full render once it settles.
  */
-export function Preview({ editor, renderer, output }: Props) {
+export function Preview({ editor, renderer, output, transform, onShown, children }: Props) {
   const boxRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [box, setBox] = useState<Box | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
-  const latest = useRef({ box, output });
-  latest.current = { box, output };
+  const latest = useRef({ box, output, onShown });
+  latest.current = { box, output, onShown };
 
   useEffect(() => {
     const element = boxRef.current;
@@ -107,6 +114,7 @@ export function Preview({ editor, renderer, output }: Props) {
       canvas.dataset["quality"] = quality;
       canvas.dataset["renders"] = String(renders);
       setError(undefined);
+      latest.current.onShown?.(recipe);
     };
 
     // One preview render at a time, so each finishes and shows even during a fast drag;
@@ -172,12 +180,15 @@ export function Preview({ editor, renderer, output }: Props) {
 
   return (
     <div class="preview" ref={boxRef}>
-      <canvas
-        ref={canvasRef}
-        class="preview-canvas"
-        role="img"
-        aria-label={output === "depth" ? "Depth map preview" : "Stereogram preview"}
-      />
+      <div class="preview-surface" style={transform === undefined ? undefined : { transform }}>
+        <canvas
+          ref={canvasRef}
+          class="preview-canvas"
+          role="img"
+          aria-label={output === "depth" ? "Depth map preview" : "Stereogram preview"}
+        />
+        {children}
+      </div>
       {error === undefined ? null : (
         <p class="preview-error" role="alert">
           The preview couldn't be rendered: {error}

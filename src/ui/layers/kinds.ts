@@ -1,5 +1,6 @@
 import type { FunctionComponent } from "preact";
 import type { Layer } from "../../core/recipe.ts";
+import { DrawingEditor, DrawingIcon } from "../drawing/DrawingEditor.tsx";
 import { SampleEditor, SampleIcon } from "./SampleEditor.tsx";
 import { TextEditor, TextIcon } from "./TextEditor.tsx";
 
@@ -65,5 +66,19 @@ export const LAYER_KINDS: Registry = {
       edgeWidth: 0.03,
     }),
     Editor: TextEditor,
+  },
+  drawing: {
+    label: "Drawing",
+    Icon: DrawingIcon,
+    create: () => ({
+      kind: "drawing",
+      id: "drawing",
+      name: "Drawing",
+      visible: true,
+      blend: "max",
+      depth: 1,
+      strokes: [],
+    }),
+    Editor: DrawingEditor,
   },
 };
