@@ -5,13 +5,13 @@ const TAU = 2 * Math.PI;
 
 /**
  * A shape on the unit disc, in coordinates `(u, v)` scaled so the shape's radius is 1,
- * with `v` pointing down and `r` the distance from the centre. `height` runs from 0 to
- * 1; `inside` is the distance in from the shape's edge, in the same units, and is
- * negative outside it.
+ * with `v` pointing down and `r` the distance from the centre. `inside` is the distance
+ * in from the shape's edge, in the same units, and is negative outside it. `height`,
+ * from 0 to 1, also receives that distance.
  */
 type ShapeFunctions = {
-  height: (u: number, v: number, r: number) => number;
   inside: (u: number, v: number, r: number) => number;
+  height: (u: number, v: number, r: number, inside: number) => number;
 };
 
 const disc = (_u: number, _v: number, r: number) => 1 - r;
@@ -34,17 +34,23 @@ function ripples(rings: number): ShapeFunctions {
 
 /** A regular polygon pyramid with a vertex pointing up, inscribed in the unit circle. */
 function pyramid(sides: number): ShapeFunctions {
-  const wedge = TAU / sides;
   const apothem = Math.cos(Math.PI / sides);
-  /** The point's distance out towards the edge, as a fraction of the way from the centre. */
-  const extent = (u: number, v: number, r: number) => {
-    const angle = Math.atan2(v, u) + Math.PI / 2 - Math.PI / sides;
-    const offset = angle - wedge * Math.round(angle / wedge);
-    return (r * Math.cos(offset)) / apothem;
-  };
+  const normals = Float64Array.from({ length: sides * 2 }, (_, i) => {
+    const angle = -Math.PI / 2 + (Math.PI * (2 * (i >> 1) + 1)) / sides;
+    return i % 2 === 0 ? Math.cos(angle) : Math.sin(angle);
+  });
   return {
-    height: (u, v, r) => Math.max(0, 1 - extent(u, v, r)),
-    inside: (u, v, r) => (1 - extent(u, v, r)) * apothem,
+    inside: (u, v) => {
+      let extent = -Infinity;
+      for (let i = 0; i < normals.length; i += 2) {
+        const along = u * normals[i] + v * normals[i + 1];
+        if (along > extent) {
+          extent = along;
+        }
+      }
+      return apothem - extent;
+    },
+    height: (_u, _v, _r, inside) => Math.max(0, inside / apothem),
   };
 }
 
@@ -116,16 +122,18 @@ export function rasteriseSample(
   const y1 = Math.min(height, Math.ceil(cy + radius + 1));
   for (let y = y0; y < y1; y++) {
     const v = (y + 0.5 - cy) / radius;
+    const vSquared = v * v;
     for (let x = x0; x < x1; x++) {
       const u = (x + 0.5 - cx) / radius;
-      const r = Math.hypot(u, v);
-      const alpha = inside(u, v, r) * radius + 0.5;
+      const r = Math.sqrt(u * u + vSquared);
+      const edge = inside(u, v, r);
+      const alpha = edge * radius + 0.5;
       if (alpha <= 0) {
         continue;
       }
       const i = y * width + x;
       target.coverage[i] = alpha < 1 ? alpha : 1;
-      target.depth[i] = shapeHeight(u, v, r);
+      target.depth[i] = shapeHeight(u, v, r, edge);
     }
   }
 }
