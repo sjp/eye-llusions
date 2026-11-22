@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "check": "oxlint --deny-warnings --report-unused-disable-directives && oxfmt --check && node scripts/unused-exports.mjs",
     "fmt": "oxfmt",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "test:perf": "vitest run --config vitest.perf.config.ts --passWithNoTests"
   },
   "dependencies": {
     "preact": "^11.2.0"
