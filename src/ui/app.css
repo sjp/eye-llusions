@@ -698,3 +698,49 @@ h2 {
 .panel-note.error {
   color: #ff9a9a;
 }
+
+.panel-note.warning {
+  color: #ffd27a;
+}
+
+.palette-editor {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.palette-editor legend {
+  margin-bottom: 4px;
+  padding: 0;
+}
+
+.palette-stops {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.palette-stops li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.palette-colour {
+  flex: 1;
+  min-width: 0;
+  height: var(--target);
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+
+.palette-colour:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

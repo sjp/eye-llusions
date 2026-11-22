@@ -1,10 +1,11 @@
 import { useEffect, useId, useRef } from "preact/hooks";
 import type { Palette, Recipe, TextureGenerator, TextureSpec } from "../../core/recipe.ts";
-import { PALETTE_PRESETS } from "../../core/texture/palette.ts";
+import { PALETTE_PRESETS, paletteStops } from "../../core/texture/palette.ts";
 import { scaleLimits } from "../../core/texture/scale.ts";
 import type { Editor } from "../../state/editor.ts";
 import { Panel } from "../Panel.tsx";
 import { Slider } from "../Slider.tsx";
+import { ContrastWarning, PaletteEditor } from "./PaletteEditor.tsx";
 import { paletteSwatch, textureSwatch } from "./swatches.ts";
 
 /** Each generator with the parameters it starts with. */
@@ -102,6 +103,10 @@ const PRESET_LABELS: Readonly<Record<string, string>> = {
 
 function PalettePicker({ palette, editor }: { palette: Palette; editor: Editor }) {
   const name = useId();
+  const custom: Palette & { type: "custom" } = {
+    type: "custom",
+    stops: [...paletteStops(palette)],
+  };
   return (
     <fieldset class="choice-picker">
       <legend>Palette</legend>
@@ -130,6 +135,26 @@ function PalettePicker({ palette, editor }: { palette: Palette; editor: Editor }
             </label>
           );
         })}
+        <label>
+          <input
+            type="radio"
+            name={name}
+            value="custom"
+            checked={palette.type === "custom"}
+            onChange={() => {
+              // Custom colours start from the palette in use.
+              editor.setTexture({ palette: custom });
+            }}
+          />
+          <SwatchCanvas
+            class="palette-swatch"
+            width={STRIP_WIDTH}
+            height={STRIP_HEIGHT}
+            draw={() => paletteSwatch(custom, STRIP_WIDTH, STRIP_HEIGHT)}
+            deps={[custom.stops.join(",")]}
+          />
+          <span>Custom</span>
+        </label>
       </div>
     </fieldset>
   );
@@ -222,6 +247,10 @@ export function TexturePanel({ editor }: { editor: Editor }) {
       <GeneratorSettings generator={recipe.texture.generator} editor={editor} />
       <ScaleSlider recipe={recipe} editor={editor} />
       <PalettePicker palette={recipe.texture.palette} editor={editor} />
+      {recipe.texture.palette.type === "custom" ? (
+        <PaletteEditor stops={recipe.texture.palette.stops} editor={editor} />
+      ) : null}
+      <ContrastWarning palette={recipe.texture.palette} />
       <button
         type="button"
         class="button"

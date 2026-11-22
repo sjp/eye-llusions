@@ -25,7 +25,7 @@ export const MIN_LUMINANCE_SPREAD = 0.4;
 /** Number of entries in a palette lookup table. */
 export const PALETTE_LEVELS = 256;
 
-function paletteStops(palette: Palette): readonly string[] {
+export function paletteStops(palette: Palette): readonly string[] {
   if (palette.type === "custom") {
     return palette.stops;
   }
