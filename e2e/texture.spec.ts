@@ -53,3 +53,50 @@ test("the pattern settings follow the chosen generator", async ({ page }) => {
   await expect(page.getByRole("slider", { name: "Edge shading" })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+const HALF_SKY = new URL("fixtures/half-sky.png", import.meta.url);
+
+test("an uploaded tile changes the preview, warns about flat areas and takes jitter", async ({
+  page,
+}) => {
+  const { canvas, violations, errors } = await open(page);
+  const original = await settledPixels(canvas, (await renders(canvas)) - 1);
+
+  await page.getByRole("radio", { name: "Tile" }).check();
+  await expect(page.getByText("Tile missing")).toBeVisible();
+  await expect(page.getByRole("radio", { name: "Mono" })).toHaveCount(0);
+
+  let count = await renders(canvas);
+  await page.getByLabel("Tile image").setInputFiles(HALF_SKY.pathname);
+  await expect(page.getByRole("button", { name: "Replace tile" })).toBeVisible();
+  await expect(page.getByText(/Large parts of this tile are flat/)).toBeVisible();
+  const tiled = await settledPixels(canvas, count);
+  expect(tiled).not.toBe(original);
+
+  count = await renders(canvas);
+  await page.getByRole("slider", { name: "Jitter" }).fill("0.5");
+  await expect(page.getByText(/Large parts of this tile are flat/)).toHaveCount(0);
+  const jittered = await settledPixels(canvas, count);
+  expect(jittered).not.toBe(tiled);
+
+  count = await renders(canvas);
+  await page.getByRole("radio", { name: "1/2" }).check();
+  expect(await settledPixels(canvas, count)).not.toBe(jittered);
+  expect(violations).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test("a custom palette with colours of equal brightness shows a warning", async ({ page }) => {
+  const { canvas, violations, errors } = await open(page);
+  await page.getByRole("radio", { name: "Custom" }).check();
+  await expect(page.getByLabel("Colour 1", { exact: true })).toHaveValue("#000000");
+  await expect(page.getByText(/too similar in brightness/)).toHaveCount(0);
+
+  const count = await renders(canvas);
+  await page.getByLabel("Colour 1", { exact: true }).fill("#ff0000");
+  await page.getByLabel("Colour 2", { exact: true }).fill("#7f7f7f");
+  await expect(page.getByText(/too similar in brightness/)).toBeVisible();
+  await settledPixels(canvas, count);
+  expect(violations).toEqual([]);
+  expect(errors).toEqual([]);
+});
