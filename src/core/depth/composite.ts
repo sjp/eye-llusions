@@ -1,5 +1,9 @@
 import type { Layer, Recipe } from "../recipe.ts";
 import type { LayerField, RasterContext, Rasteriser, RasteriserRegistry } from "./raster.ts";
+import { rasteriseSample } from "./sample.ts";
+
+/** Rasterisers that need nothing beyond plain TypeScript. */
+const CORE_RASTERISERS: RasteriserRegistry = { sample: rasteriseSample };
 
 /** Runs a rasteriser if there is one, resolving to whether the layer was drawn. */
 function run<L>(
@@ -67,13 +71,14 @@ function blend(out: Float32Array, layer: Layer, { depth, coverage }: LayerField)
  * Flattens the recipe's visible layers, bottom to top, into one depth buffer of
  * `width * height` values from 0 (far) to 1 (near). Each layer's depth is scaled by its
  * strength and combined through its coverage using its blend mode. Layers of a kind
- * with no rasteriser in `registry` are skipped.
+ * with no rasteriser in `registry` are skipped. Environments that can rasterise more
+ * kinds pass a registry that extends `CORE_RASTERISERS`.
  */
 export async function compositeDepth(
   recipe: Recipe,
   width: number,
   height: number,
-  registry: RasteriserRegistry = {},
+  registry: RasteriserRegistry = CORE_RASTERISERS,
 ): Promise<Float32Array> {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
     throw new RangeError("width and height must be positive integers");
