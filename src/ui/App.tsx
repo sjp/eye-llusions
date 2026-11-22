@@ -5,7 +5,7 @@ import { Editor } from "../state/editor.ts";
 import { ControlSheet, type SheetSnap } from "./ControlSheet.tsx";
 import { createDrawingTools, DrawingToolsContext } from "./drawing/tools.ts";
 import { LayersPanel } from "./layers/LayersPanel.tsx";
-import { TexturePanel } from "./PlaceholderPanels.tsx";
+import { TexturePanel } from "./texture/TexturePanel.tsx";
 import type { Renderer } from "./Preview.tsx";
 import { Stage } from "./Stage.tsx";
 import { useUndoShortcuts } from "./useUndoShortcuts.ts";
@@ -98,7 +98,7 @@ export function App({ editor: givenEditor, renderer: givenRenderer }: Props) {
         <ControlSheet snap={snap} onSnap={setSnap}>
           <ViewPanel editor={editor} />
           <LayersPanel editor={editor} selection={selection} />
-          <TexturePanel />
+          <TexturePanel editor={editor} />
         </ControlSheet>
       </div>
     </DrawingToolsContext.Provider>

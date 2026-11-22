@@ -564,24 +564,24 @@ h2 {
   font: inherit;
 }
 
-.shape-picker {
+.choice-picker {
   margin: 0;
   padding: 0;
   border: 0;
 }
 
-.shape-picker legend {
+.choice-picker legend {
   margin-bottom: 4px;
   padding: 0;
 }
 
-.shape-options {
+.choice-options {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
   gap: 4px;
 }
 
-.shape-options label {
+.choice-options label {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -595,25 +595,40 @@ h2 {
   text-align: center;
 }
 
-.shape-options input {
+.choice-options input {
   position: absolute;
   inset: 0;
   margin: 0;
   opacity: 0;
 }
 
-.shape-options label:has(input:checked) {
+.choice-options label:has(input:checked) {
   border-color: var(--accent);
   color: var(--accent);
 }
 
-.shape-options label:has(input:focus-visible),
+.choice-options label:has(input:focus-visible),
 .layer-select:focus-visible,
 .layer-visible input:focus-visible,
 .text-input:focus-visible,
 .select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+.texture-swatch,
+.palette-swatch {
+  width: 100%;
+  border-radius: 4px;
+  image-rendering: pixelated;
+}
+
+.texture-swatch {
+  height: auto;
+}
+
+.palette-swatch {
+  height: 12px;
 }
 
 .shape-thumbnail {

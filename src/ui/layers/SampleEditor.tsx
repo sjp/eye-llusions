@@ -72,9 +72,9 @@ function ShapePicker({
 }) {
   const name = useId();
   return (
-    <fieldset class="shape-picker">
+    <fieldset class="choice-picker">
       <legend>Shape</legend>
-      <div class="shape-options">
+      <div class="choice-options">
         {SHAPES.map(({ shape, label }) => (
           <label key={shape.type}>
             <input
