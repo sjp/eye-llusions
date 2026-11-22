@@ -1,9 +1,11 @@
 import { describe, expect, test } from "vitest";
 import {
   canReplaceAsset,
+  canReplaceTile,
   freeAssetId,
   newAssetId,
   missingAssets,
+  newTileId,
   pruneAssets,
   referencedAssets,
 } from "./assets.ts";
@@ -35,10 +37,23 @@ function recipe(layers: ImageLayer[], assets: Record<string, Asset>): Recipe {
   return { ...base, layers: [...base.layers, ...layers], assets };
 }
 
+function withTile(value: Recipe, asset: string): Recipe {
+  return {
+    ...value,
+    texture: { ...value.texture, generator: { type: "tile", asset, divisions: 1, jitter: 0 } },
+  };
+}
+
 describe("referencedAssets", () => {
   test("lists each asset image layers use once, in stack order", () => {
     const value = recipe([image("a", "two"), image("b", "one"), image("c", "two")], {});
     expect(referencedAssets(value)).toEqual(["two", "one"]);
+  });
+
+  test("includes a tile texture's image after the layers'", () => {
+    const value = withTile(recipe([image("a", "two"), image("b", "tile-1")], {}), "tile-1");
+    expect(referencedAssets(value)).toEqual(["two", "tile-1"]);
+    expect(referencedAssets(withTile(recipe([], {}), "tile-2"))).toEqual(["tile-2"]);
   });
 });
 
@@ -49,6 +64,11 @@ describe("missingAssets", () => {
     });
     expect(missingAssets(value)).toEqual(["gone", "constructor"]);
   });
+
+  test("lists a missing tile", () => {
+    expect(missingAssets(withTile(recipe([], {}), "tile-1"))).toEqual(["tile-1"]);
+    expect(missingAssets(withTile(recipe([], { "tile-1": pixel }), "tile-1"))).toEqual([]);
+  });
 });
 
 describe("pruneAssets", () => {
@@ -57,6 +77,16 @@ describe("pruneAssets", () => {
     const pruned = pruneAssets(value);
     expect(Object.keys(pruned.assets)).toEqual(["kept"]);
     expect(pruned.assets.kept).toBe(pixel);
+  });
+
+  test("keeps a tile texture's image", () => {
+    const value = withTile(
+      recipe([image("a", "kept")], { kept: pixel, "tile-1": pixel }),
+      "tile-1",
+    );
+    expect(pruneAssets(value)).toBe(value);
+    const switched = { ...value, texture: defaultRecipe().texture };
+    expect(Object.keys(pruneAssets(switched).assets)).toEqual(["kept"]);
   });
 
   test("returns the same recipe when every asset is used", () => {
@@ -69,6 +99,7 @@ describe("freeAssetId", () => {
   test("avoids held and referenced IDs", () => {
     const value = recipe([image("a", "image-2")], { "image-1": pixel });
     expect(freeAssetId(value, "image")).toBe("image-3");
+    expect(freeAssetId(withTile(value, "tile-1"), "tile")).toBe("tile-2");
   });
 });
 
@@ -88,6 +119,7 @@ describe("canReplaceAsset", () => {
   test("allows replacing an asset only this layer uses, even when full", () => {
     expect(canReplaceAsset(recipe([image("a", "a0")], full), "a")).toBe(true);
     expect(canReplaceAsset(recipe([image("a", "a0"), image("b", "a0")], full), "a")).toBe(false);
+    expect(canReplaceAsset(withTile(recipe([image("a", "a0")], full), "a0"), "a")).toBe(false);
   });
 
   test("refuses layers that aren't images", () => {
@@ -103,5 +135,35 @@ describe("newAssetId", () => {
   test("picks a free ID when the asset is held or shared", () => {
     expect(newAssetId(recipe([image("a", "photo")], { photo: pixel }), "a")).toBe("image-1");
     expect(newAssetId(recipe([image("a", "photo"), image("b", "photo")], {}), "a")).toBe("image-1");
+  });
+});
+
+describe("canReplaceTile", () => {
+  const full = Object.fromEntries(
+    Array.from({ length: RECIPE_LIMITS.assets }, (_, i) => [`a${String(i)}`, pixel]),
+  );
+
+  test("allows a new tile while there is room", () => {
+    expect(canReplaceTile(recipe([], {}))).toBe(true);
+    expect(canReplaceTile(withTile(recipe([], {}), "tile-1"))).toBe(true);
+  });
+
+  test("refuses a new tile when full, unless it replaces one only the texture uses", () => {
+    expect(canReplaceTile(recipe([], full))).toBe(false);
+    expect(canReplaceTile(withTile(recipe([], full), "gone"))).toBe(false);
+    expect(canReplaceTile(withTile(recipe([], full), "a0"))).toBe(true);
+    expect(canReplaceTile(withTile(recipe([image("a", "a0")], full), "a0"))).toBe(false);
+  });
+});
+
+describe("newTileId", () => {
+  test("reuses a missing tile ID that only the texture uses", () => {
+    expect(newTileId(withTile(recipe([], {}), "tile-4"))).toBe("tile-4");
+  });
+
+  test("picks a free ID when the tile is held, shared or not in use", () => {
+    expect(newTileId(withTile(recipe([], { "tile-1": pixel }), "tile-1"))).toBe("tile-2");
+    expect(newTileId(withTile(recipe([image("a", "tile-1")], {}), "tile-1"))).toBe("tile-2");
+    expect(newTileId(recipe([], {}))).toBe("tile-1");
   });
 });

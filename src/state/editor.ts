@@ -52,17 +52,25 @@ export class Editor {
     this.#edit((recipe) => clampScale({ ...recipe, view: { ...recipe.view, ...patch } }), options);
   }
 
-  /** The scale is clamped into its fusible range for the generator and view. */
-  setTexture(patch: Partial<Texture>, options: EditOptions = {}): void {
-    this.#edit(
-      (recipe) => clampScale({ ...recipe, texture: { ...recipe.texture, ...patch } }),
-      options,
-    );
+  /**
+   * The scale is clamped into its fusible range for the generator and view. `assets` are
+   * added, such as a tile's image, and assets nothing uses any more are dropped.
+   */
+  setTexture(
+    patch: Partial<Texture>,
+    options: EditOptions & { assets?: Record<string, Asset> } = {},
+  ): void {
+    this.#edit((recipe) => {
+      const texture = { ...recipe.texture, ...patch };
+      const assets =
+        options.assets === undefined ? recipe.assets : { ...recipe.assets, ...options.assets };
+      return pruneAssets(clampScale({ ...recipe, texture, assets }));
+    }, options);
   }
 
   /**
    * Replaces the layer stack with `update`'s result; returning `layers` itself changes
-   * nothing. `assets` are added with the new stack, and assets no layer uses any more are
+   * nothing. `assets` are added with the new stack, and assets nothing uses any more are
    * dropped.
    */
   updateLayers(

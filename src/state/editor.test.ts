@@ -4,6 +4,24 @@ import { defaultRecipe, type Asset, type ImageLayer } from "../core/recipe.ts";
 import { scaleLimits } from "../core/texture/scale.ts";
 import { Editor } from "./editor.ts";
 
+function imageLayer(asset: string): ImageLayer {
+  return {
+    kind: "image",
+    id: "image-1",
+    name: "Image",
+    visible: true,
+    blend: "max",
+    depth: 1,
+    asset,
+    fit: "contain",
+    invert: false,
+    levels: { black: 0, white: 1 },
+    blur: 0,
+    posterize: null,
+    threshold: null,
+  };
+}
+
 describe("Editor", () => {
   test("starts from the default recipe with nothing to undo", () => {
     const editor = new Editor();
@@ -99,21 +117,7 @@ describe("Editor", () => {
 
   test("layer updates add assets and drop ones no layer uses", () => {
     const pixel: Asset = { format: "gray", width: 1, height: 1, data: new Uint8Array([9]) };
-    const layer: ImageLayer = {
-      kind: "image",
-      id: "image-1",
-      name: "Image",
-      visible: true,
-      blend: "max",
-      depth: 1,
-      asset: "photo",
-      fit: "contain",
-      invert: false,
-      levels: { black: 0, white: 1 },
-      blur: 0,
-      posterize: null,
-      threshold: null,
-    };
+    const layer = imageLayer("photo");
     const editor = new Editor();
     editor.updateLayers((layers) => [...layers, layer], { assets: { photo: pixel } });
     expect(editor.recipe.value.assets).toEqual({ photo: pixel });
@@ -121,5 +125,47 @@ describe("Editor", () => {
     expect(editor.recipe.value.assets).toEqual({});
     editor.undo();
     expect(editor.recipe.value.assets.photo).toBe(pixel);
+  });
+
+  test("keeps a tile texture's image through layer edits, undo and redo", () => {
+    const tile: Asset = { format: "rgba", width: 1, height: 1, data: new Uint8Array(4) };
+    const photo: Asset = { format: "gray", width: 1, height: 1, data: new Uint8Array([9]) };
+    const editor = new Editor();
+    const generator = { type: "tile", asset: "tile-1", divisions: 1, jitter: 0 } as const;
+    editor.setTexture({ generator }, { assets: { "tile-1": tile } });
+    expect(editor.recipe.value.assets).toEqual({ "tile-1": tile });
+
+    // Adding and removing image layers drops only their own assets.
+    editor.updateLayers((layers) => [...layers, imageLayer("photo")], { assets: { photo } });
+    editor.updateLayers((layers) => layers.slice(0, 1));
+    expect(editor.recipe.value.assets).toEqual({ "tile-1": tile });
+    editor.updateLayers((layers) => layers.map((layer) => ({ ...layer, depth: 0.5 })));
+    editor.setTexture({ generator: { ...generator, jitter: 0.5 } });
+    editor.setView({ repeats: 10 });
+    expect(editor.recipe.value.assets["tile-1"]).toBe(tile);
+
+    for (let step = 0; step < 5; step++) {
+      editor.undo();
+      expect(editor.recipe.value.assets["tile-1"]).toBe(tile);
+    }
+    editor.undo();
+    expect(editor.recipe.value.assets).toEqual({});
+    while (editor.canRedo.value) {
+      editor.redo();
+      expect(editor.recipe.value.assets["tile-1"]).toBe(tile);
+    }
+    expect(editor.recipe.value.texture.generator).toEqual({ ...generator, jitter: 0.5 });
+
+    // A new tile replaces the old one, and switching pattern drops it.
+    const next: Asset = { ...tile, data: new Uint8Array(4).fill(1) };
+    editor.setTexture(
+      { generator: { ...generator, asset: "tile-2" } },
+      { assets: { "tile-2": next } },
+    );
+    expect(editor.recipe.value.assets).toEqual({ "tile-2": next });
+    editor.setTexture({ generator: { type: "colourNoise" } });
+    expect(editor.recipe.value.assets).toEqual({});
+    editor.undo();
+    expect(editor.recipe.value.assets["tile-2"]).toBe(next);
   });
 });
