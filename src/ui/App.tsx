@@ -3,7 +3,8 @@ import { RenderClient } from "../render/client.ts";
 import type { RenderOutput } from "../render/protocol.ts";
 import { Editor } from "../state/editor.ts";
 import { ControlSheet, type SheetSnap } from "./ControlSheet.tsx";
-import { LayersPanel, TexturePanel } from "./PlaceholderPanels.tsx";
+import { LayersPanel } from "./layers/LayersPanel.tsx";
+import { TexturePanel } from "./PlaceholderPanels.tsx";
 import { Preview, type Renderer } from "./Preview.tsx";
 import { Segmented } from "./Segmented.tsx";
 import { useUndoShortcuts } from "./useUndoShortcuts.ts";
@@ -101,7 +102,7 @@ export function App({ editor: givenEditor, renderer: givenRenderer }: Props) {
       </main>
       <ControlSheet snap={snap} onSnap={setSnap}>
         <ViewPanel editor={editor} />
-        <LayersPanel />
+        <LayersPanel editor={editor} />
         <TexturePanel />
       </ControlSheet>
     </div>
