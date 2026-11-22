@@ -87,7 +87,7 @@ function spiralStairs(steps: number, turns: number): ShapeFunctions {
   };
 }
 
-function shapeFunctions(shape: SampleShape): ShapeFunctions {
+function shapeFunctions(shape: SampleShape): ShapeFunctions | undefined {
   switch (shape.type) {
     case "sphere":
       return sphere();
@@ -99,6 +99,8 @@ function shapeFunctions(shape: SampleShape): ShapeFunctions {
       return torus(shape.thickness);
     case "spiralStairs":
       return spiralStairs(shape.steps, shape.turns);
+    case "figure":
+      return undefined;
     default:
       throw new RangeError("unknown sample shape");
   }
@@ -106,13 +108,18 @@ function shapeFunctions(shape: SampleShape): ShapeFunctions {
 
 /**
  * Rasterises a procedural shape centred on `layer.center`, `layer.size` canvas heights
- * across. Coverage fades over about one pixel at the shape's edge.
+ * across. Coverage fades over about one pixel at the shape's edge. Figures need their
+ * pictures, which `rasteriseFigure` draws, so they're skipped here.
  */
 export function rasteriseSample(
   layer: SampleLayer,
   { width, height, target }: RasterContext,
 ): void {
-  const { height: shapeHeight, inside } = shapeFunctions(layer.shape);
+  const functions = shapeFunctions(layer.shape);
+  if (functions === undefined) {
+    return;
+  }
+  const { height: shapeHeight, inside } = functions;
   const radius = (layer.size / 2) * height;
   const cx = layer.center.x * width;
   const cy = layer.center.y * height;

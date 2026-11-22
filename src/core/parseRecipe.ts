@@ -15,6 +15,7 @@ import {
   type TextureGenerator,
   type TextureSpec,
 } from "./recipe.ts";
+import { FIGURE_IDS } from "./depth/figure.ts";
 import { clampScale } from "./texture/scale.ts";
 
 /**
@@ -198,7 +199,14 @@ function point(value: unknown, path: string): Point {
 
 function sampleShape(value: unknown, path: string): SampleShape {
   const at = (key: string) => join(path, key);
-  const type = tag(value, path, "type", ["sphere", "ripples", "pyramid", "torus", "spiralStairs"]);
+  const type = tag(value, path, "type", [
+    "sphere",
+    "ripples",
+    "pyramid",
+    "torus",
+    "spiralStairs",
+    "figure",
+  ]);
   switch (type) {
     case "sphere":
       object(value, path, ["type"]);
@@ -222,6 +230,10 @@ function sampleShape(value: unknown, path: string): SampleShape {
         steps: integer(fields.steps, at("steps"), 2, 64),
         turns: number(fields.turns, at("turns"), 0.25, 8),
       };
+    }
+    case "figure": {
+      const fields = object(value, path, ["type", "figure"]);
+      return { type, figure: oneOf(fields.figure, at("figure"), FIGURE_IDS) };
     }
     default:
       return unreachable(type);

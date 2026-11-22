@@ -70,6 +70,7 @@ function fullRecipe(): Recipe {
         posterize: 4,
         threshold: null,
       },
+      { ...sphere, id: "heart", shape: { type: "figure", figure: "heart" } },
     ],
     texture: {
       generator: { type: "colourNoise" },
@@ -278,6 +279,12 @@ describe("parseRecipe rejects", () => {
     ["a fractional count", "layers.0.shape.rings", 2.5, "layers[0].shape.rings"],
     ["an unknown layer kind", "layers.0.kind", "model", "layers[0].kind"],
     ["an unknown shape", "layers.0.shape", { type: "cube" }, "layers[0].shape.type"],
+    [
+      "an unknown figure",
+      "layers.0.shape",
+      { type: "figure", figure: "dragon" },
+      "layers[0].shape.figure",
+    ],
     ["an unknown blend mode", "layers.0.blend", "multiply", "layers[0].blend"],
     ["an unknown view mode", "view.mode", "parallel"],
     ["an unknown generator", "texture.generator.type", "photo"],

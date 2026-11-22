@@ -4,6 +4,8 @@
  * and sizes are fractions of the canvas height.
  */
 
+import type { FigureId } from "./depth/figure.ts";
+
 export const RECIPE_VERSION = 1;
 
 export type Recipe = {
@@ -46,7 +48,9 @@ export type SampleShape =
   | { type: "ripples"; rings: number }
   | { type: "pyramid"; sides: number }
   | { type: "torus"; thickness: number }
-  | { type: "spiralStairs"; steps: number; turns: number };
+  | { type: "spiralStairs"; steps: number; turns: number }
+  /** A bundled depth picture, drawn in a square `size` canvas heights across. */
+  | { type: "figure"; figure: FigureId };
 
 export type SampleLayer = LayerCommon & {
   kind: "sample";
