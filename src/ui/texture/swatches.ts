@@ -20,14 +20,13 @@ function toImageData(colours: Uint32Array, width: number, height: number): Image
  */
 export function textureSwatch(
   texture: TextureSpec,
-  recipe: Pick<Recipe, "seed" | "aspect" | "view">,
+  recipe: Pick<Recipe, "seed" | "aspect" | "view" | "assets">,
   width: number,
   height: number,
 ): ImageData {
   const imageHeight = (width * recipe.view.repeats) / recipe.aspect;
   const sample = buildSampler(
-    texture,
-    recipe.seed,
+    { ...recipe, texture },
     Math.round(width * recipe.view.repeats),
     imageHeight,
   );

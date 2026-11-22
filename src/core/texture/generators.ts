@@ -27,8 +27,11 @@ function unknownGenerator(generator: never): never {
   throw new RangeError(`Unknown generator ${JSON.stringify(generator)}`);
 }
 
+/** Generators whose values are coloured by a palette. */
+export type ValueGenerator = Exclude<TextureGenerator, { type: "tile" }>;
+
 export function createGenerator(
-  generator: TextureGenerator,
+  generator: ValueGenerator,
   context: GeneratorContext,
 ): ValueFunction {
   switch (generator.type) {

@@ -62,7 +62,7 @@ export async function renderPixels(
     depthOfField: recipe.view.depthOfField,
     mode: recipe.view.mode,
     oversample,
-    sample: buildSampler(recipe.texture, recipe.seed, width, height),
+    sample: buildSampler(recipe, width, height),
     out: pixels,
   });
   return pixels;

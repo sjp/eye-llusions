@@ -232,6 +232,11 @@ describe("parseRecipe clamps finite numbers into range", () => {
       { type: "scatteredShapes", density: 2 },
       { type: "scatteredShapes", density: 1 },
     ],
+    [
+      "texture.generator",
+      { type: "tile", asset: "tile-1", divisions: 9, jitter: 2 },
+      { type: "tile", asset: "tile-1", divisions: 4, jitter: 1 },
+    ],
   ])("%s", (path, value, expected) => {
     expect(get(parseRecipe(withValue(path, value)), path)).toEqual(expected);
   });
@@ -275,7 +280,19 @@ describe("parseRecipe rejects", () => {
     ["an unknown shape", "layers.0.shape", { type: "cube" }, "layers[0].shape.type"],
     ["an unknown blend mode", "layers.0.blend", "multiply", "layers[0].blend"],
     ["an unknown view mode", "view.mode", "parallel"],
-    ["an unknown generator", "texture.generator.type", "tile"],
+    ["an unknown generator", "texture.generator.type", "photo"],
+    [
+      "a fractional tile division",
+      "texture.generator",
+      { type: "tile", asset: "tile-1", divisions: 1.5, jitter: 0 },
+      "texture.generator.divisions",
+    ],
+    [
+      "an invalid tile asset ID",
+      "texture.generator",
+      { type: "tile", asset: "a b", divisions: 1, jitter: 0 },
+      "texture.generator.asset",
+    ],
     [
       "a fractional octave count",
       "texture.generator",

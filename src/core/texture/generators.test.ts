@@ -1,14 +1,13 @@
 import { describe, expect, test } from "vitest";
 import { createRandom } from "../random.ts";
-import type { TextureGenerator } from "../recipe.ts";
 import type { ValueFunction } from "./context.ts";
-import { createGenerator } from "./generators.ts";
+import { createGenerator, type ValueGenerator } from "./generators.ts";
 import { FEATURE_CELLS } from "./scale.ts";
 
 const WIDTH = 200;
 const HEIGHT = 50;
 
-function generate(generator: TextureGenerator, seed: number, cellSize = 1): ValueFunction {
+function generate(generator: ValueGenerator, seed: number, cellSize = 1): ValueFunction {
   return createGenerator(generator, {
     random: createRandom(seed),
     width: WIDTH,
@@ -30,12 +29,12 @@ function grid(values: ValueFunction, cellSize = 1): number[] {
 const mean = (values: readonly number[]) => values.reduce((sum, v) => sum + v, 0) / values.length;
 
 /** Generators whose value is constant across each cell. */
-const CELL_GENERATORS: TextureGenerator[] = [
+const CELL_GENERATORS: ValueGenerator[] = [
   { type: "randomDots", density: 0.5 },
   { type: "colourNoise" },
 ];
 
-const GENERATORS: TextureGenerator[] = [
+const GENERATORS: ValueGenerator[] = [
   ...CELL_GENERATORS,
   { type: "fractalNoise", octaves: 4 },
   { type: "cells", shading: 0.5 },

@@ -120,7 +120,12 @@ export type TextureGenerator =
   /** Voronoi cells, darkened towards their borders by `shading`. */
   | { type: "cells"; shading: number }
   /** Small glyphs over a noise background; `density` is the chance of a glyph per spot. */
-  | { type: "scatteredShapes"; density: number };
+  | { type: "scatteredShapes"; density: number }
+  /**
+   * An uploaded image, resampled so `divisions` copies fit exactly across one far-plane
+   * strip and keeping its own colours. `jitter` mixes in seeded noise from 0 to 1.
+   */
+  | { type: "tile"; asset: string; divisions: number; jitter: number };
 
 export type Palette =
   | { type: "preset"; id: string }

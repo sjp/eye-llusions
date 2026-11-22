@@ -13,6 +13,8 @@ export const FEATURE_CELLS: Readonly<Record<TextureGenerator["type"], number>> =
   fractalNoise: 6,
   cells: 5,
   scatteredShapes: 6,
+  /** A tile is fitted to the strip; the scale only sizes its fallback dots. */
+  tile: 1,
 };
 
 /**

@@ -33,7 +33,7 @@ export function downscaleSize(
 const grays = new WeakMap<Asset, Uint8Array>();
 
 /** The asset's pixels as one luminance byte each. */
-function grayPixels(asset: Asset): Uint8Array {
+export function grayPixels(asset: Asset): Uint8Array {
   if (asset.format === "gray") {
     return asset.data;
   }

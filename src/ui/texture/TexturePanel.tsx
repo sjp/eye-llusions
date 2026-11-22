@@ -167,6 +167,7 @@ function GeneratorSettings({ generator, editor }: { generator: TextureGenerator;
         density,
       }));
     case "colourNoise":
+    case "tile":
       return null;
     case "fractalNoise":
       return slider(

@@ -48,6 +48,9 @@ export class RecipeError extends Error {
 
 type Fields = Record<string, unknown>;
 
+/** The most tile copies across one strip. */
+const MAX_TILE_DIVISIONS = 4;
+
 const ID_PATTERN = /^[\w-]+$/;
 const COLOUR_PATTERN = /^#[\da-f]{6}$/;
 /** Positions may lie partly off the canvas. */
@@ -339,6 +342,7 @@ function generator(value: unknown, path: string): TextureGenerator {
     "fractalNoise",
     "cells",
     "scatteredShapes",
+    "tile",
   ]);
   switch (type) {
     case "randomDots": {
@@ -359,6 +363,15 @@ function generator(value: unknown, path: string): TextureGenerator {
     case "scatteredShapes": {
       const fields = object(value, path, ["type", "density"]);
       return { type, density: number(fields.density, at("density"), 0, 1) };
+    }
+    case "tile": {
+      const fields = object(value, path, ["type", "asset", "divisions", "jitter"]);
+      return {
+        type,
+        asset: id(fields.asset, at("asset")),
+        divisions: integer(fields.divisions, at("divisions"), 1, MAX_TILE_DIVISIONS),
+        jitter: number(fields.jitter, at("jitter"), 0, 1),
+      };
     }
     default:
       return unreachable(type);
