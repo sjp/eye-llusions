@@ -1,6 +1,7 @@
 import type { FunctionComponent } from "preact";
 import type { Layer } from "../../core/recipe.ts";
 import { SampleEditor, SampleIcon } from "./SampleEditor.tsx";
+import { TextEditor, TextIcon } from "./TextEditor.tsx";
 
 type EditOptions = { coalesce?: string };
 
@@ -45,5 +46,24 @@ export const LAYER_KINDS: Registry = {
       size: 0.5,
     }),
     Editor: SampleEditor,
+  },
+  text: {
+    label: "Text",
+    Icon: TextIcon,
+    create: () => ({
+      kind: "text",
+      id: "text",
+      name: "Text",
+      visible: true,
+      blend: "max",
+      depth: 1,
+      text: "HELLO",
+      font: "anton",
+      size: 0.3,
+      center: { x: 0.5, y: 0.5 },
+      edge: "round",
+      edgeWidth: 0.03,
+    }),
+    Editor: TextEditor,
   },
 };

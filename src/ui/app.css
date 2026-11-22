@@ -595,3 +595,9 @@ h2 {
   height: 40px;
   border-radius: 4px;
 }
+
+.text-area {
+  min-height: calc(var(--target) * 2);
+  padding: 8px;
+  resize: vertical;
+}
