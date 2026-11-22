@@ -1,6 +1,7 @@
 import { effect } from "@preact/signals";
 import { describe, expect, test } from "vitest";
 import { defaultRecipe, type Asset, type ImageLayer } from "../core/recipe.ts";
+import { scaleLimits } from "../core/texture/scale.ts";
 import { Editor } from "./editor.ts";
 
 describe("Editor", () => {
@@ -56,6 +57,17 @@ describe("Editor", () => {
     expect(editor.recipe.value.layers).toEqual([]);
     editor.undo();
     expect(editor.recipe.value.layers).toHaveLength(1);
+  });
+
+  test("keeps the texture scale within the fusible range", () => {
+    const editor = new Editor();
+    const { aspect } = defaultRecipe();
+    editor.setTexture({ scale: 100 });
+    expect(editor.recipe.value.texture.scale).toBe(scaleLimits("randomDots", aspect, 8).max);
+    editor.setTexture({ generator: { type: "cells", shading: 0 } });
+    expect(editor.recipe.value.texture.scale).toBe(scaleLimits("cells", aspect, 8).max);
+    editor.setView({ repeats: 32 });
+    expect(editor.recipe.value.texture.scale).toBe(scaleLimits("cells", aspect, 32).max);
   });
 
   test("a layer update that returns the same stack adds no undo step", () => {

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { RECIPE_LIMITS, RecipeError, parseRecipe } from "./parseRecipe.ts";
 import { createRandom } from "./random.ts";
+import { scaleLimits } from "./texture/scale.ts";
 import { defaultRecipe, type Layer, type Recipe, type SampleLayer, type Stroke } from "./recipe.ts";
 
 type Data = Record<string, unknown>;
@@ -219,7 +220,6 @@ describe("parseRecipe clamps finite numbers into range", () => {
     ["layers.0.shape.rings", 1000, 32],
     ["layers.1.center", { x: -9, y: 9 }, { x: -0.5, y: 1.5 }],
     ["layers.3.strokes.0.points", [-9, 9], [-0.5, 1.5]],
-    ["texture.scale", 1e-9, 0.1],
     [
       "texture.generator",
       { type: "fractalNoise", octaves: 9 },
@@ -233,6 +233,15 @@ describe("parseRecipe clamps finite numbers into range", () => {
     ],
   ])("%s", (path, value, expected) => {
     expect(get(parseRecipe(withValue(path, value)), path)).toEqual(expected);
+  });
+});
+
+describe("parseRecipe clamps the texture scale", () => {
+  test.each([1e-9, 1e9])("%f into the range for the view", (scale) => {
+    const { aspect, view, texture } = fullRecipe();
+    const { min, max } = scaleLimits(texture.generator.type, aspect, view.repeats);
+    const parsed = parseRecipe(withValue("texture.scale", scale)).texture.scale;
+    expect(parsed).toBe(scale < 1 ? min : max);
   });
 });
 

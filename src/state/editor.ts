@@ -1,5 +1,6 @@
 import { batch, signal, type ReadonlySignal } from "@preact/signals";
 import { pruneAssets } from "../core/assets.ts";
+import { clampScale } from "../core/texture/scale.ts";
 import { defaultRecipe, type Asset, type Layer, type Recipe } from "../core/recipe.ts";
 import { History } from "./history.ts";
 
@@ -46,12 +47,17 @@ export class Editor {
     this.editing = this.#editing;
   }
 
+  /** The texture scale follows the strip width into its fusible range. */
   setView(patch: Partial<View>, options: EditOptions = {}): void {
-    this.#edit((recipe) => ({ ...recipe, view: { ...recipe.view, ...patch } }), options);
+    this.#edit((recipe) => clampScale({ ...recipe, view: { ...recipe.view, ...patch } }), options);
   }
 
+  /** The scale is clamped into its fusible range for the generator and view. */
   setTexture(patch: Partial<Texture>, options: EditOptions = {}): void {
-    this.#edit((recipe) => ({ ...recipe, texture: { ...recipe.texture, ...patch } }), options);
+    this.#edit(
+      (recipe) => clampScale({ ...recipe, texture: { ...recipe.texture, ...patch } }),
+      options,
+    );
   }
 
   /**

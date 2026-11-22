@@ -15,6 +15,7 @@ import {
   type TextureGenerator,
   type TextureSpec,
 } from "./recipe.ts";
+import { clampScale } from "./texture/scale.ts";
 
 /**
  * Size limits for untrusted recipes. Counts beyond them are rejected; finite numbers
@@ -385,12 +386,13 @@ function palette(value: unknown, path: string): Palette {
   }
 }
 
+/** The scale is clamped by the caller, since its range depends on the view. */
 function texture(value: unknown, path: string): TextureSpec {
   const fields = object(value, path, ["generator", "palette", "scale"]);
   return {
     generator: generator(fields.generator, join(path, "generator")),
     palette: palette(fields.palette, join(path, "palette")),
-    scale: number(fields.scale, join(path, "scale"), 0.1, 10),
+    scale: number(fields.scale, join(path, "scale"), -Infinity, Infinity),
   };
 }
 
@@ -473,7 +475,7 @@ function recipe(value: unknown): Recipe {
     ids.add(layerId);
   }
   const view = object(fields.view, "view", ["repeats", "depthOfField", "mode"]);
-  return {
+  return clampScale({
     version: RECIPE_VERSION,
     aspect: number(fields.aspect, "aspect", 0.2, 5),
     seed,
@@ -485,7 +487,7 @@ function recipe(value: unknown): Recipe {
       mode: oneOf(view.mode, "view.mode", ["wall", "cross"]),
     },
     assets: Object.hasOwn(fields, "assets") ? assets(fields.assets, "assets") : {},
-  };
+  });
 }
 
 /**
