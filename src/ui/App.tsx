@@ -1,8 +1,87 @@
-export function App() {
+import { useEffect, useState } from "preact/hooks";
+import { RenderClient } from "../render/client.ts";
+import type { RenderOutput } from "../render/protocol.ts";
+import { Editor } from "../state/editor.ts";
+import { ControlSheet, type SheetSnap } from "./ControlSheet.tsx";
+import { LayersPanel, TexturePanel } from "./PlaceholderPanels.tsx";
+import { Preview, type Renderer } from "./Preview.tsx";
+import { Segmented } from "./Segmented.tsx";
+import { useUndoShortcuts } from "./useUndoShortcuts.ts";
+import { ViewPanel } from "./ViewPanel.tsx";
+
+const OUTPUTS = [
+  { value: "stereogram", label: "Stereogram" },
+  { value: "depth", label: "Depth" },
+] as const;
+
+type Props = {
+  editor?: Editor;
+  /** Defaults to a render worker owned by the app. */
+  renderer?: Renderer;
+};
+
+function useRenderer(given: Renderer | undefined): Renderer {
+  const [state] = useState(() => {
+    if (given !== undefined) {
+      return { renderer: given, owned: undefined };
+    }
+    const owned = new RenderClient();
+    return { renderer: owned, owned };
+  });
+  useEffect(
+    () => () => {
+      state.owned?.dispose();
+    },
+    [state],
+  );
+  return state.renderer;
+}
+
+export function App({ editor: givenEditor, renderer: givenRenderer }: Props) {
+  const [editor] = useState(() => givenEditor ?? new Editor());
+  const renderer = useRenderer(givenRenderer);
+  const [output, setOutput] = useState<RenderOutput>("stereogram");
+  const [snap, setSnap] = useState<SheetSnap>("peek");
+  useUndoShortcuts(editor);
+
   return (
-    <main class="app">
-      <h1>Eye-llusion</h1>
-      <p>Create and view magic-eye images.</p>
-    </main>
+    <div class="shell" data-sheet={snap}>
+      <header class="toolbar">
+        <h1>Eye-llusion</h1>
+        <div class="toolbar-actions">
+          <button
+            type="button"
+            class="button"
+            aria-keyshortcuts="Control+Z Meta+Z"
+            disabled={!editor.canUndo.value}
+            onClick={() => {
+              editor.undo();
+            }}
+          >
+            Undo
+          </button>
+          <button
+            type="button"
+            class="button"
+            aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y"
+            disabled={!editor.canRedo.value}
+            onClick={() => {
+              editor.redo();
+            }}
+          >
+            Redo
+          </button>
+        </div>
+      </header>
+      <main class="stage">
+        <Segmented legend="Preview" options={OUTPUTS} value={output} onChange={setOutput} />
+        <Preview editor={editor} renderer={renderer} output={output} />
+      </main>
+      <ControlSheet snap={snap} onSnap={setSnap}>
+        <ViewPanel editor={editor} />
+        <LayersPanel />
+        <TexturePanel />
+      </ControlSheet>
+    </div>
   );
 }

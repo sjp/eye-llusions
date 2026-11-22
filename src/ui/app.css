@@ -1,8 +1,13 @@
 :root {
   color-scheme: dark;
   --bg: #000;
+  --surface: #151515;
+  --surface-raised: #222;
+  --border: #333;
   --fg: #e8e8e8;
   --muted: #9a9a9a;
+  --accent: #7cc4ff;
+  --target: 44px;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   background: var(--bg);
   color: var(--fg);
@@ -14,26 +19,308 @@
 
 body {
   margin: 0;
-  min-height: 100dvh;
   background: var(--bg);
+  overscroll-behavior: none;
 }
 
-.app {
+h1,
+h2 {
+  margin: 0;
+}
+
+/* Layout: toolbar on top, preview below. On narrow screens the controls are a bottom
+   sheet over the bottom of the screen; on wide ones they are a column on the right. */
+
+.shell {
+  /* Resting sheet heights; ControlSheet.tsx uses the same values. */
+  --sheet-peek: 128px;
+  --sheet-half: 50dvh;
+  --sheet-full: 88dvh;
+  --sheet-rest: var(--sheet-peek);
+  position: relative;
   display: grid;
-  place-content: center;
-  min-height: 100dvh;
-  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
-    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
-  text-align: center;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 
-.app h1 {
-  margin: 0 0 0.5rem;
-  font-size: clamp(2rem, 8vw, 3.5rem);
+.shell[data-sheet="half"] {
+  --sheet-rest: var(--sheet-half);
+}
+
+.shell[data-sheet="full"] {
+  --sheet-rest: var(--sheet-full);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 8px
+    max(12px, env(safe-area-inset-left));
+  border-bottom: 1px solid var(--border);
+}
+
+.toolbar h1 {
+  font-size: 1.25rem;
   letter-spacing: 0.02em;
 }
 
-.app p {
+.toolbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding: 8px max(8px, env(safe-area-inset-right)) 8px max(8px, env(safe-area-inset-left));
+}
+
+.preview {
+  position: relative;
+  display: grid;
+  flex: 1;
+  place-items: center;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.preview-canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.preview-error {
+  position: absolute;
+  inset: auto 0 0;
+  margin: 0;
+  padding: 8px;
+  background: var(--surface);
+  color: #ff9a9a;
+}
+
+/* Bottom sheet */
+
+.shell > .stage {
+  padding-bottom: calc(var(--sheet-rest) + 8px);
+}
+
+.sheet {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  height: var(--sheet-peek);
+  border-top: 1px solid var(--border);
+  border-radius: 16px 16px 0 0;
+  background: var(--surface);
+  transition: height 0.2s ease;
+}
+
+.sheet[data-snap="half"] {
+  height: var(--sheet-half);
+}
+
+.sheet[data-snap="full"] {
+  height: var(--sheet-full);
+}
+
+.sheet.dragging {
+  height: var(--sheet-drag);
+  transition: none;
+}
+
+.sheet-handle {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 100%;
+  min-height: var(--target);
+  border: 0;
+  background: none;
+  cursor: grab;
+  touch-action: none;
+}
+
+.sheet-grip {
+  width: 40px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--muted);
+}
+
+.sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+}
+
+@media (min-width: 768px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr) 360px;
+  }
+
+  .toolbar {
+    grid-column: 1 / -1;
+  }
+
+  .shell > .stage {
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+
+  .sheet,
+  .sheet[data-snap] {
+    position: static;
+    height: auto;
+    min-height: 0;
+    border-top: 0;
+    border-left: 1px solid var(--border);
+    border-radius: 0;
+    transition: none;
+  }
+
+  .sheet-handle {
+    display: none;
+  }
+
+  .sheet-body {
+    padding: 16px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) 16px;
+  }
+}
+
+/* Controls */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel:last-child {
+  border-bottom: 0;
+}
+
+.panel h2 {
+  font-size: 1rem;
+}
+
+.panel-note {
   margin: 0;
   color: var(--muted);
+}
+
+.button {
+  min-width: var(--target);
+  min-height: var(--target);
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--fg);
+  font: inherit;
+}
+
+.button:disabled {
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+.button:focus-visible,
+.sheet-handle:focus-visible,
+.segmented input:focus-visible + span,
+.slider input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.slider {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: 8px;
+}
+
+.slider output {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.slider input {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-height: var(--target);
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.segmented {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.segmented legend {
+  margin-bottom: 4px;
+  padding: 0;
+}
+
+.stage > .segmented {
+  align-self: center;
+}
+
+.stage > .segmented legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.segmented-options {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.segmented label {
+  position: relative;
+  display: flex;
+  flex: 1;
+}
+
+.segmented input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+}
+
+.segmented span {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  min-height: var(--target);
+  padding: 0 16px;
+  background: var(--surface-raised);
+  white-space: nowrap;
+}
+
+.segmented input:checked + span {
+  background: var(--accent);
+  color: #000;
 }
