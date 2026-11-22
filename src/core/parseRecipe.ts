@@ -141,6 +141,13 @@ function string(value: unknown, path: string, maxLength: number): string {
   return value;
 }
 
+function uint32(value: unknown, path: string): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 0xffffffff) {
+    throw new RecipeError(path, "expected an unsigned 32-bit integer");
+  }
+  return value;
+}
+
 function id(value: unknown, path: string): string {
   const result = string(value, path, RECIPE_LIMITS.idLength);
   if (!ID_PATTERN.test(result)) {
@@ -388,11 +395,12 @@ function palette(value: unknown, path: string): Palette {
 
 /** The scale is clamped by the caller, since its range depends on the view. */
 function texture(value: unknown, path: string): TextureSpec {
-  const fields = object(value, path, ["generator", "palette", "scale"]);
+  const fields = object(value, path, ["generator", "palette", "scale", "seed"]);
   return {
     generator: generator(fields.generator, join(path, "generator")),
     palette: palette(fields.palette, join(path, "palette")),
     scale: number(fields.scale, join(path, "scale"), -Infinity, Infinity),
+    seed: uint32(fields.seed, join(path, "seed")),
   };
 }
 
@@ -459,10 +467,7 @@ function recipe(value: unknown): Recipe {
         : "expected a version number",
     );
   }
-  const seed = fields.seed;
-  if (typeof seed !== "number" || !Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) {
-    throw new RecipeError("seed", "expected an unsigned 32-bit integer");
-  }
+  const seed = uint32(fields.seed, "seed");
   const budget = { points: 0 };
   const layers = array(fields.layers, "layers", RECIPE_LIMITS.layers).map((item, index) =>
     layer(item, `layers[${String(index)}]`, budget),

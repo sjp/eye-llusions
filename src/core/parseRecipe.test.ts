@@ -75,6 +75,7 @@ function fullRecipe(): Recipe {
       generator: { type: "colourNoise" },
       palette: { type: "custom", stops: ["#000000", "#ff8800", "#ffffff"] },
       scale: 2,
+      seed: 123,
     },
     view: { repeats: 10, depthOfField: 0.25, mode: "cross" },
     assets: {
@@ -265,6 +266,7 @@ describe("parseRecipe rejects", () => {
     ["a negative seed", "seed", -1],
     ["a fractional seed", "seed", 1.5],
     ["a seed over 32 bits", "seed", 2 ** 32],
+    ["a negative texture seed", "texture.seed", -1],
     ["NaN", "aspect", Number.NaN],
     ["Infinity", "view.repeats", Infinity],
     ["a numeric string", "layers.0.depth", "1", "layers[0].depth"],

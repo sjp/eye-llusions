@@ -84,6 +84,11 @@ export class Editor {
     this.#edit((recipe) => ({ ...recipe, seed: this.#nextSeed() }), {});
   }
 
+  /** Reshuffles the texture alone. */
+  newTextureSeed(): void {
+    this.setTexture({ seed: this.#nextSeed() });
+  }
+
   /** Ends a coalesced edit, so the next change starts a new undo step. */
   endEdit(): void {
     this.#history.seal();

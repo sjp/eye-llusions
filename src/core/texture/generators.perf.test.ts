@@ -14,7 +14,7 @@ test.each<TextureGenerator>([
   { type: "scatteredShapes", density: 1 },
 ])("$type samples a large stereogram's texture quickly", (generator) => {
   const sample = buildSampler(
-    { generator, palette: { type: "preset", id: "ocean" }, scale: 1 },
+    { generator, palette: { type: "preset", id: "ocean" }, scale: 1, seed: 0 },
     1,
     WIDTH,
     HEIGHT,

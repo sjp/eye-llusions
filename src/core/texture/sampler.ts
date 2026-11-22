@@ -15,7 +15,7 @@ export function buildSampler(
   height: number,
 ): (x: number, y: number) => number {
   const values = createGenerator(texture.generator, {
-    random: createRandom(deriveSeed(seed, "texture")),
+    random: createRandom((deriveSeed(seed, "texture") ^ texture.seed) >>> 0),
     width,
     height,
     cellSize: Math.max(1, texture.scale * BASE_CELL * height),

@@ -92,6 +92,7 @@ const TEXT_RECIPE = {
     generator: { type: "randomDots", density: 0.5 },
     palette: { type: "preset", id: "mono" },
     scale: 1,
+    seed: 0,
   },
   view: { repeats: 8, depthOfField: 1 / 3, mode: "wall" },
   assets: {},

@@ -49,6 +49,15 @@ describe("Editor", () => {
     expect(editor.recipe.value.seed).toBe(defaultRecipe().seed);
   });
 
+  test("new texture seed changes only the texture's seed", () => {
+    const editor = new Editor(defaultRecipe(), () => 7);
+    editor.newTextureSeed();
+    expect(editor.recipe.value.texture.seed).toBe(7);
+    expect(editor.recipe.value.seed).toBe(defaultRecipe().seed);
+    editor.undo();
+    expect(editor.recipe.value.texture.seed).toBe(0);
+  });
+
   test("texture and layer actions replace their part of the recipe", () => {
     const editor = new Editor();
     editor.setTexture({ scale: 2 });

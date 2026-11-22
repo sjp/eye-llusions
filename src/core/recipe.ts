@@ -132,6 +132,11 @@ export type TextureSpec = {
   palette: Palette;
   /** Multiplier on the generator's base feature size. */
   scale: number;
+  /**
+   * Unsigned 32-bit integer mixed into the recipe seed's texture sub-stream, so the
+   * texture can be reshuffled on its own.
+   */
+  seed: number;
 };
 
 type AssetFormat = "gray" | "rgba";
@@ -166,6 +171,7 @@ export function defaultRecipe(): Recipe {
       generator: { type: "randomDots", density: 0.5 },
       palette: { type: "preset", id: "mono" },
       scale: 1,
+      seed: 0,
     },
     view: { repeats: 8, depthOfField: 1 / 3, mode: "wall" },
     assets: {},

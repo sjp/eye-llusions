@@ -7,11 +7,13 @@ const DOTS: TextureSpec = {
   generator: { type: "randomDots", density: 0.5 },
   palette: { type: "custom", stops: ["#102030", "#ffeedd"] },
   scale: 1,
+  seed: 0,
 };
 const NOISE: TextureSpec = {
   generator: { type: "colourNoise" },
   palette: { type: "preset", id: "ocean" },
   scale: 1,
+  seed: 0,
 };
 
 function row(sample: (x: number, y: number) => number, y = 0, width = 400): number[] {
@@ -26,6 +28,13 @@ describe("buildSampler", () => {
     expect(row(buildSampler(texture, 1, 400, 300))).not.toEqual(
       row(buildSampler(texture, 2, 400, 300)),
     );
+  });
+
+  test("reshuffles with the texture seed alone", () => {
+    const base = row(buildSampler(NOISE, 1, 400, 300));
+    const reshuffled = row(buildSampler({ ...NOISE, seed: 5 }, 1, 400, 300));
+    expect(reshuffled).not.toEqual(base);
+    expect(row(buildSampler({ ...NOISE, seed: 5 }, 1, 400, 300))).toEqual(reshuffled);
   });
 
   test("colours random dots with the palette's end stops", () => {
