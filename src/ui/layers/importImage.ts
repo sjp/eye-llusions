@@ -1,7 +1,7 @@
 import { downscaleSize, luminance } from "../../core/depth/image.ts";
 import type { Asset } from "../../core/recipe.ts";
 
-/** Longest side of a stored image, in pixels. */
+/** Longest side of a stored image, in pixels, by default. */
 const MAX_SIDE = 1024;
 const MAX_FILE_BYTES = 40 * 1024 * 1024;
 const MAX_DECODED_SIDE = 16_384;
@@ -28,11 +28,15 @@ function canvas2d(width: number, height: number) {
 }
 
 /**
- * Decodes an image file into a grey asset no larger than 1024 pixels on its longest
- * side. Decoding goes through `createImageBitmap`, never an image element, so it works
- * under a CSP that blocks blob: and data: images.
+ * Decodes an image file into an asset no larger than `maxSide` pixels on its longest
+ * side: grey by default, or opaque colour over black. Decoding goes through
+ * `createImageBitmap`, never an image element, so it works under a CSP that blocks
+ * blob: and data: images.
  */
-export async function importImage(file: Blob): Promise<Asset> {
+export async function importImage(
+  file: Blob,
+  { format = "gray", maxSide = MAX_SIDE }: { format?: Asset["format"]; maxSide?: number } = {},
+): Promise<Asset> {
   if (file.type !== "" && !file.type.startsWith("image/")) {
     throw new ImageImportError("That file isn't an image. Choose a PNG, JPEG, WebP or GIF.");
   }
@@ -49,13 +53,19 @@ export async function importImage(file: Blob): Promise<Asset> {
     if (bitmap.width > MAX_DECODED_SIDE || bitmap.height > MAX_DECODED_SIDE) {
       throw new ImageImportError("That image is too large. Choose a smaller one.");
     }
-    const { width, height } = downscaleSize(bitmap.width, bitmap.height, MAX_SIDE);
+    const { width, height } = downscaleSize(bitmap.width, bitmap.height, maxSide);
     const context = canvas2d(width, height);
+    if (format === "rgba") {
+      context.fillStyle = "#000";
+      context.fillRect(0, 0, width, height);
+    }
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = "high";
     context.drawImage(bitmap, 0, 0, width, height);
     const { data } = context.getImageData(0, 0, width, height);
-    return { format: "gray", width, height, data: luminance(data) };
+    return format === "rgba"
+      ? { format, width, height, data: new Uint8Array(data.buffer) }
+      : { format, width, height, data: luminance(data) };
   } finally {
     bitmap.close();
   }

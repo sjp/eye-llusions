@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from "preact/hooks";
 import type { Palette, Recipe, TextureGenerator, TextureSpec } from "../../core/recipe.ts";
+import { freeAssetId } from "../../core/assets.ts";
 import { PALETTE_PRESETS, paletteStops } from "../../core/texture/palette.ts";
 import { scaleLimits } from "../../core/texture/scale.ts";
 import type { Editor } from "../../state/editor.ts";
@@ -7,6 +8,7 @@ import { Panel } from "../Panel.tsx";
 import { Slider } from "../Slider.tsx";
 import { ContrastWarning, PaletteEditor } from "./PaletteEditor.tsx";
 import { paletteSwatch, textureSwatch } from "./swatches.ts";
+import { TileSettings } from "./TileSettings.tsx";
 
 /** Each generator with the parameters it starts with. */
 const GENERATORS: readonly { generator: TextureGenerator; label: string }[] = [
@@ -15,6 +17,8 @@ const GENERATORS: readonly { generator: TextureGenerator; label: string }[] = [
   { generator: { type: "fractalNoise", octaves: 4 }, label: "Marble" },
   { generator: { type: "cells", shading: 0.4 }, label: "Cells" },
   { generator: { type: "scatteredShapes", density: 0.8 }, label: "Shapes" },
+  // The asset ID is filled in with a free one when the tile is picked.
+  { generator: { type: "tile", asset: "tile", divisions: 1, jitter: 0 }, label: "Tile" },
 ];
 
 const SWATCH_WIDTH = 96;
@@ -51,7 +55,9 @@ function GeneratorPicker({ recipe, editor }: { recipe: Recipe; editor: Editor })
     <fieldset class="choice-picker">
       <legend>Pattern</legend>
       <div class="choice-options">
-        {GENERATORS.map(({ generator: initial, label }) => {
+        {GENERATORS.map(({ generator: preset, label }) => {
+          const initial: TextureGenerator =
+            preset.type === "tile" ? { ...preset, asset: freeAssetId(recipe, "tile") } : preset;
           const selected = initial.type === texture.generator.type;
           const swatch: TextureSpec = {
             ...texture,
@@ -74,7 +80,8 @@ function GeneratorPicker({ recipe, editor }: { recipe: Recipe; editor: Editor })
                 height={SWATCH_HEIGHT}
                 draw={() => textureSwatch(swatch, recipe, SWATCH_WIDTH, SWATCH_HEIGHT)}
                 deps={[
-                  swatch.generator,
+                  selected ? swatch.generator : initial.type,
+                  recipe.assets,
                   texture.palette,
                   texture.scale,
                   texture.seed,
@@ -241,16 +248,24 @@ function ScaleSlider({ recipe, editor }: { recipe: Recipe; editor: Editor }) {
 
 export function TexturePanel({ editor }: { editor: Editor }) {
   const recipe = editor.recipe.value;
+  const { generator, palette } = recipe.texture;
   return (
     <Panel title="Texture">
       <GeneratorPicker recipe={recipe} editor={editor} />
-      <GeneratorSettings generator={recipe.texture.generator} editor={editor} />
-      <ScaleSlider recipe={recipe} editor={editor} />
-      <PalettePicker palette={recipe.texture.palette} editor={editor} />
-      {recipe.texture.palette.type === "custom" ? (
-        <PaletteEditor stops={recipe.texture.palette.stops} editor={editor} />
-      ) : null}
-      <ContrastWarning palette={recipe.texture.palette} />
+      {generator.type === "tile" ? (
+        // Tiles keep their own colours and are sized to the strip.
+        <TileSettings recipe={recipe} generator={generator} editor={editor} />
+      ) : (
+        <>
+          <GeneratorSettings generator={generator} editor={editor} />
+          <ScaleSlider recipe={recipe} editor={editor} />
+          <PalettePicker palette={palette} editor={editor} />
+          {palette.type === "custom" ? (
+            <PaletteEditor stops={palette.stops} editor={editor} />
+          ) : null}
+          <ContrastWarning palette={palette} />
+        </>
+      )}
       <button
         type="button"
         class="button"

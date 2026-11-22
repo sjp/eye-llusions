@@ -13,12 +13,12 @@ function setup() {
 
 test("offers every generator and preset, with the current ones checked", () => {
   setup();
-  for (const name of ["Dots", "Noise", "Marble", "Cells", "Shapes"]) {
+  for (const name of ["Dots", "Noise", "Marble", "Cells", "Shapes", "Tile", "Custom"]) {
     expect(screen.getByRole("radio", { name })).toBeTruthy();
   }
   expect(screen.getByRole<HTMLInputElement>("radio", { name: "Dots" }).checked).toBe(true);
   expect(screen.getByRole<HTMLInputElement>("radio", { name: "Mono" }).checked).toBe(true);
-  expect(screen.getAllByRole("radio")).toHaveLength(12);
+  expect(screen.getAllByRole("radio")).toHaveLength(13);
 });
 
 test("switching generator starts from its defaults and is undoable", () => {
