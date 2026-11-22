@@ -1,9 +1,8 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect } from "preact/hooks";
 import { missingAssets } from "../core/assets.ts";
 import type { Editor } from "../state/editor.ts";
 import { decodeRecipe, linkPayload, ShareLinkError } from "../state/share.ts";
-
-type Notice = { tone: "error" | "info"; text: string };
+import type { Notice } from "./Notice.tsx";
 
 function missingNotice(count: number): Notice | undefined {
   if (count === 0) {
@@ -19,14 +18,10 @@ function missingNotice(count: number): Notice | undefined {
 /**
  * Opens the shared scene in the address bar's `#r=` fragment, on load and whenever the
  * fragment changes. A link opened on load starts history over; a later one is an undo
- * step. A link that can't be opened leaves the current scene and returns an error notice.
+ * step. A link that can't be opened leaves the current scene and reports an error notice.
+ * `report` must keep its identity across renders.
  */
-export function useShareLink(editor: Editor): {
-  notice: Notice | undefined;
-  dismiss: () => void;
-} {
-  const [notice, setNotice] = useState<Notice | undefined>(undefined);
-
+export function useShareLink(editor: Editor, report: (notice: Notice | undefined) => void): void {
   useEffect(() => {
     let latest = 0;
     let first = true;
@@ -44,7 +39,7 @@ export function useShareLink(editor: Editor): {
         const recipe = await decodeRecipe(payload);
         if (request === latest) {
           editor.open(recipe, { fresh });
-          setNotice(missingNotice(missingAssets(recipe).length));
+          report(missingNotice(missingAssets(recipe).length));
         }
       } catch (error) {
         if (request === latest) {
@@ -52,7 +47,7 @@ export function useShareLink(editor: Editor): {
             error instanceof ShareLinkError
               ? error.message
               : "The shared scene couldn't be opened.";
-          setNotice({ tone: "error", text });
+          report({ tone: "error", text });
         }
       }
     };
@@ -65,12 +60,5 @@ export function useShareLink(editor: Editor): {
       latest = -1;
       removeEventListener("hashchange", onHashChange);
     };
-  }, [editor]);
-
-  return {
-    notice,
-    dismiss: () => {
-      setNotice(undefined);
-    },
-  };
+  }, [editor, report]);
 }

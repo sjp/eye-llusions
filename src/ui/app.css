@@ -815,6 +815,55 @@ h2 {
   margin-left: auto;
 }
 
+.export-sizes {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.export-sizes legend {
+  margin-bottom: 4px;
+  padding: 0;
+}
+
+.export-sizes label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--target);
+}
+
+.export-sizes input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.export-size {
+  margin-left: auto;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.export-custom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.export-custom input {
+  width: 8em;
+  min-height: var(--target);
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+
 @media (max-width: 767px) {
   .toolbar h1 {
     font-size: 1rem;
@@ -826,5 +875,27 @@ h2 {
 
   .toolbar-actions .button {
     padding: 0 10px;
+  }
+}
+
+/* Phones keep every toolbar button; the name stays for screen readers. */
+@media (max-width: 479px) {
+  .toolbar h1 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .toolbar-actions {
+    flex: 1;
+    justify-content: space-between;
+    gap: 2px;
+  }
+
+  .toolbar-actions .button {
+    padding: 0 8px;
   }
 }
