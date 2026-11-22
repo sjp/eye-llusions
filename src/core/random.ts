@@ -4,7 +4,7 @@
  * saved image, so the golden values in the tests must never need updating.
  */
 
-type Random = {
+export type Random = {
   /** A uniformly distributed unsigned 32-bit integer. */
   uint32: () => number;
   /** A uniformly distributed float in [0, 1). */
@@ -14,7 +14,7 @@ type Random = {
 const GOLDEN_GAMMA = 0x9e3779b9;
 
 /** A bijective 32-bit integer finaliser with low bias (lowbias32). */
-function mix32(value: number): number {
+export function mix32(value: number): number {
   let h = value;
   h ^= h >>> 16;
   h = Math.imul(h, 0x21f0aaad);
