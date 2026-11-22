@@ -108,10 +108,19 @@ describe("renderStereogram", () => {
       depth[i] = ((i * 7919) % 101) / 100;
     }
     const inverted = depth.map((d) => 1 - d);
-    expect(render(depth, { mode: "cross" })).toEqual(render(inverted));
+    const sameEyeRepeats = (2 * REPEATS * (1 - MU)) / (2 - MU);
+    expect(render(depth, { mode: "cross" })).toEqual(render(inverted, { repeats: sameEyeRepeats }));
+  });
 
-    const background = render(flat(0), { mode: "cross" });
-    expect(smallestPeriod(background, 0)).toBe(NEAR_PERIOD);
+  test("gives the background the same strip width in both modes", () => {
+    for (const mode of ["wall", "cross"] as const) {
+      expect(smallestPeriod(render(flat(0), { mode }), 0)).toBe(WIDTH / REPEATS);
+      const image = render(withRect(250, 350), { mode });
+      for (let x = 0; x + FAR_PERIOD < 200; x++) {
+        expect(pixel(image, x, 1)).toBe(pixel(image, x + FAR_PERIOD, 1));
+      }
+    }
+    expect(() => render(flat(0), { mode: "cross", depthOfField: 1 })).toThrow(RangeError);
   });
 
   test("is deterministic and fills a given output buffer", () => {

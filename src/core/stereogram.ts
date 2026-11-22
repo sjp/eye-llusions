@@ -8,7 +8,7 @@ export type StereogramOptions = {
   depth: Float32Array;
   width: number;
   height: number;
-  /** Pattern repeats across the image width at the far plane. */
+  /** Pattern repeats across the image width where the input depth is 0, in both modes. */
   repeats: number;
   /** Depth range as a fraction of the far-plane strip width. */
   depthOfField: number;
@@ -42,6 +42,9 @@ export function renderStereogram(options: StereogramOptions): Uint8ClampedArray 
   if (!(mu > 0 && mu <= 1)) {
     throw new RangeError(`depthOfField must be in (0, 1], got ${String(mu)}`);
   }
+  if (mode === "cross" && mu === 1) {
+    throw new RangeError("depthOfField must be below 1 in cross-eyed mode");
+  }
   if (depth.length !== width * height) {
     throw new RangeError(`depth must hold ${String(width * height)} values`);
   }
@@ -52,7 +55,8 @@ export function renderStereogram(options: StereogramOptions): Uint8ClampedArray 
 
   const cross = mode === "cross";
   const w = width * oversample;
-  const eye = (2 * w) / repeats;
+  // Cross-eyed mode views the inverted depth, so its background lies at z = 1.
+  const eye = cross ? ((2 - mu) * w) / ((1 - mu) * repeats) : (2 * w) / repeats;
   const ztStep = 2 / (mu * eye);
   const z = new Float32Array(w);
   const same = new Int32Array(w);
