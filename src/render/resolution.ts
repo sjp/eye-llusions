@@ -78,3 +78,49 @@ export function createPreviewScheduler(
     cancel,
   };
 }
+
+/**
+ * Most pixels an exported image may have: 4096², the largest canvas iPhones and iPads
+ * can draw and encode.
+ */
+export const EXPORT_MAX_PIXELS = 4096 * 4096;
+
+/** Exports above this many pixels (4K UHD) may run out of memory on phones. */
+export const EXPORT_LARGE_PIXELS = 3840 * 2160;
+
+/** Narrowest custom export, in pixels. */
+export const EXPORT_MIN_WIDTH = 64;
+
+/** Named export sizes as boxes, long side first; the box turns with the picture. */
+export const EXPORT_PRESETS = [
+  { id: "phone", label: "Phone wallpaper", long: 2796, short: 1290 },
+  { id: "hd", label: "1080p", long: 1920, short: 1080 },
+  { id: "4k", label: "4K", long: 3840, short: 2160 },
+  { id: "a4", label: "A4 print, 300 DPI", long: 3508, short: 2480 },
+] as const;
+
+type ExportPreset = (typeof EXPORT_PRESETS)[number];
+
+/** Widest export allowed at `aspect` (width / height). */
+export function maxExportWidth(aspect: number): number {
+  let width = Math.floor(Math.sqrt(EXPORT_MAX_PIXELS * aspect));
+  while (width * Math.max(1, Math.round(width / aspect)) > EXPORT_MAX_PIXELS) {
+    width -= 1;
+  }
+  return width;
+}
+
+/** The export `width` pixels wide at `aspect`, with width clamped to the allowed range. */
+export function exportSizeForWidth(aspect: number, width: number): Size {
+  const clamped = Math.round(Math.min(Math.max(width, EXPORT_MIN_WIDTH), maxExportWidth(aspect)));
+  return { width: clamped, height: Math.max(1, Math.round(clamped / aspect)) };
+}
+
+/** The largest size at `aspect` that fits the preset's box, turned to match the picture. */
+export function presetExportSize(aspect: number, preset: ExportPreset): Size {
+  const box =
+    aspect >= 1
+      ? { width: preset.long, height: preset.short }
+      : { width: preset.short, height: preset.long };
+  return exportSizeForWidth(aspect, Math.min(box.width, box.height * aspect));
+}
