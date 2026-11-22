@@ -17,6 +17,15 @@ export function freeLayerId(layers: readonly Layer[], prefix: string): string {
   }
 }
 
+/** `layer` with an ID and name that no layer in `layers` uses. */
+export function withFreeIdentity<L extends Layer>(layers: readonly Layer[], layer: L): L {
+  return {
+    ...layer,
+    id: freeLayerId(layers, layer.kind),
+    name: freeLayerName(layers, layer.name),
+  };
+}
+
 /** `base`, or `base N` with the smallest N ≥ 2 that no layer uses, within the name limit. */
 export function freeLayerName(layers: readonly Layer[], base: string): string {
   const used = new Set(layers.map((layer) => layer.name));

@@ -7,12 +7,11 @@ import {
   canAddLayer,
   changeLayer,
   duplicateLayer,
-  freeLayerId,
-  freeLayerName,
   insertLayer,
   moveLayer,
   removeLayer,
   selectedLayer,
+  withFreeIdentity,
 } from "../../state/layers.ts";
 import { Panel } from "../Panel.tsx";
 import { Slider } from "../Slider.tsx";
@@ -260,12 +259,7 @@ export function LayersPanel({
   const roomy = canAddLayer(layers);
 
   const add = (kind: AddableKind): void => {
-    const fresh = kind.create(editor.recipe.value);
-    const layer = {
-      ...fresh,
-      id: freeLayerId(layers, fresh.kind),
-      name: freeLayerName(layers, fresh.name),
-    };
+    const layer = withFreeIdentity(layers, kind.create(editor.recipe.value));
     editor.updateLayers((current) => insertLayer(current, layer, selected?.id));
     setSelectedId(layer.id);
   };
