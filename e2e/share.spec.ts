@@ -63,9 +63,11 @@ test("a damaged link shows an error and opens the default scene", async ({ page 
   expect(errors).toEqual([]);
 });
 
-test("the toolbar fits the screen with the share button", async ({ page }) => {
+test("the toolbar fits the screen with all its buttons", async ({ page }) => {
   await openLayers(page);
-  await expect(page.getByRole("button", { name: "Share" })).toBeInViewport();
+  for (const name of ["Open", "Save", "Share", "View", "Undo", "Redo"]) {
+    await expect(page.getByRole("button", { name, exact: true })).toBeInViewport({ ratio: 1 });
+  }
   const overflow = await page
     .locator(".toolbar")
     .evaluate((toolbar) => toolbar.scrollWidth - toolbar.clientWidth);
