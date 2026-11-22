@@ -8,6 +8,8 @@ type Props = {
   onClose: () => void;
   /** Offered when the link can't carry the whole scene. */
   onDownloadPng?: () => void;
+  /** Called when the link is copied or shared. */
+  onShared?: () => void;
 };
 
 type Status = { tone: "info" | "error"; text: string };
@@ -18,7 +20,7 @@ const lengthFormat = new Intl.NumberFormat("en");
  * Builds a link to the recipe and offers to copy or share it. The address bar only
  * changes to the link when the person copies or shares it.
  */
-export function ShareDialog({ recipe, onClose, onDownloadPng }: Props) {
+export function ShareDialog({ recipe, onClose, onDownloadPng, onShared }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const linkRef = useRef<HTMLInputElement>(null);
   const titleId = useId();
@@ -60,6 +62,7 @@ export function ShareDialog({ recipe, onClose, onDownloadPng }: Props) {
     if (location.href !== link) {
       history.replaceState(history.state, "", link);
     }
+    onShared?.();
   };
 
   const copy = async (link: string): Promise<void> => {

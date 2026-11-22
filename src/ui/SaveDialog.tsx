@@ -14,6 +14,8 @@ type Props = {
   recipe: Recipe;
   onClose: () => void;
   exportPng: ExportPng;
+  /** Called once the PNG has been downloaded or shared. */
+  onSaved?: () => void;
 };
 
 type Choice = (typeof EXPORT_PRESETS)[number]["id"] | "custom";
@@ -39,7 +41,7 @@ function canShareFiles(): boolean {
  * Renders the picture at a chosen size into a PNG that also keeps the project, then
  * downloads or shares it. The last file made is reused while nothing changes.
  */
-export function SaveDialog({ recipe, onClose, exportPng }: Props) {
+export function SaveDialog({ recipe, onClose, exportPng, onSaved }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const widthId = useId();
@@ -106,6 +108,7 @@ export function SaveDialog({ recipe, onClose, exportPng }: Props) {
     const file = await make();
     if (file !== undefined) {
       downloadBlob(file, file.name);
+      onSaved?.();
     }
   };
 
@@ -117,6 +120,7 @@ export function SaveDialog({ recipe, onClose, exportPng }: Props) {
     }
     try {
       await navigator.share({ files: [file], title: "Eye-llusion" });
+      onSaved?.();
     } catch (error) {
       if (!(error instanceof DOMException) || error.name === "AbortError") {
         return;

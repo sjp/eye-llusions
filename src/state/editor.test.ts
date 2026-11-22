@@ -187,4 +187,23 @@ describe("Editor", () => {
     expect(editor.canUndo.value).toBe(false);
     expect(editor.canRedo.value).toBe(false);
   });
+
+  test("tracks changes since the recipe was last opened, shared or saved", () => {
+    const editor = new Editor();
+    expect(editor.modified.value).toBe(false);
+    editor.setView({ repeats: 10 });
+    expect(editor.modified.value).toBe(true);
+    editor.undo();
+    expect(editor.modified.value).toBe(false);
+    editor.redo();
+    editor.markSaved();
+    expect(editor.modified.value).toBe(false);
+    editor.undo();
+    expect(editor.modified.value).toBe(true);
+
+    editor.open({ ...defaultRecipe(), seed: 42 });
+    expect(editor.modified.value).toBe(false);
+    editor.undo();
+    expect(editor.modified.value).toBe(true);
+  });
 });

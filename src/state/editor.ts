@@ -29,6 +29,9 @@ export class Editor {
   readonly #canUndo = signal(false);
   readonly #canRedo = signal(false);
   readonly #editing = signal(false);
+  readonly #modified = signal(false);
+  /** The recipe as last opened, shared or saved. */
+  #saved: Recipe;
   readonly #nextSeed: () => number;
 
   readonly recipe: ReadonlySignal<Recipe>;
@@ -36,15 +39,19 @@ export class Editor {
   readonly canRedo: ReadonlySignal<boolean>;
   /** True while a coalesced edit, such as a slider drag, is under way. */
   readonly editing: ReadonlySignal<boolean>;
+  /** True when the recipe differs from the one last opened, shared or saved. */
+  readonly modified: ReadonlySignal<boolean>;
 
   constructor(initial: Recipe = defaultRecipe(), nextSeed: () => number = randomSeed) {
     this.#history = new History(initial);
     this.#recipe = signal(initial);
+    this.#saved = initial;
     this.#nextSeed = nextSeed;
     this.recipe = this.#recipe;
     this.canUndo = this.#canUndo;
     this.canRedo = this.#canRedo;
     this.editing = this.#editing;
+    this.modified = this.#modified;
   }
 
   /** The texture scale follows the strip width into its fusible range. */
@@ -109,6 +116,13 @@ export class Editor {
       this.#history.push(recipe);
       this.#history.seal();
     }
+    this.#saved = this.#history.present;
+    this.#sync();
+  }
+
+  /** Records the current recipe as shared or saved, so it no longer counts as modified. */
+  markSaved(): void {
+    this.#saved = this.#history.present;
     this.#sync();
   }
 
@@ -139,6 +153,7 @@ export class Editor {
       this.#canUndo.value = this.#history.canUndo;
       this.#canRedo.value = this.#history.canRedo;
       this.#editing.value = this.#history.coalescing;
+      this.#modified.value = this.#history.present !== this.#saved;
     });
   }
 }
