@@ -220,6 +220,17 @@ describe("parseRecipe clamps finite numbers into range", () => {
     ["layers.1.center", { x: -9, y: 9 }, { x: -0.5, y: 1.5 }],
     ["layers.3.strokes.0.points", [-9, 9], [-0.5, 1.5]],
     ["texture.scale", 1e-9, 0.1],
+    [
+      "texture.generator",
+      { type: "fractalNoise", octaves: 9 },
+      { type: "fractalNoise", octaves: 6 },
+    ],
+    ["texture.generator", { type: "cells", shading: -1 }, { type: "cells", shading: 0 }],
+    [
+      "texture.generator",
+      { type: "scatteredShapes", density: 2 },
+      { type: "scatteredShapes", density: 1 },
+    ],
   ])("%s", (path, value, expected) => {
     expect(get(parseRecipe(withValue(path, value)), path)).toEqual(expected);
   });
@@ -254,6 +265,18 @@ describe("parseRecipe rejects", () => {
     ["an unknown blend mode", "layers.0.blend", "multiply", "layers[0].blend"],
     ["an unknown view mode", "view.mode", "parallel"],
     ["an unknown generator", "texture.generator.type", "tile"],
+    [
+      "a fractional octave count",
+      "texture.generator",
+      { type: "fractalNoise", octaves: 2.5 },
+      "texture.generator.octaves",
+    ],
+    [
+      "a missing generator parameter",
+      "texture.generator",
+      { type: "cells" },
+      "texture.generator.shading",
+    ],
     ["a non-boolean flag", "layers.0.visible", 1, "layers[0].visible"],
     ["an invalid layer ID", "layers.0.id", "a b", "layers[0].id"],
     ["an empty layer ID", "layers.0.id", "", "layers[0].id"],

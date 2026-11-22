@@ -112,7 +112,15 @@ export type ImageLayer = LayerCommon & {
 
 export type Layer = SampleLayer | TextLayer | DrawingLayer | ImageLayer;
 
-export type TextureGenerator = { type: "randomDots"; density: number } | { type: "colourNoise" };
+export type TextureGenerator =
+  | { type: "randomDots"; density: number }
+  | { type: "colourNoise" }
+  /** Organic, marble-like noise; `octaves` adds ever finer detail. */
+  | { type: "fractalNoise"; octaves: number }
+  /** Voronoi cells, darkened towards their borders by `shading`. */
+  | { type: "cells"; shading: number }
+  /** Small glyphs over a noise background; `density` is the chance of a glyph per spot. */
+  | { type: "scatteredShapes"; density: number };
 
 export type Palette =
   | { type: "preset"; id: string }

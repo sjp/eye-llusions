@@ -324,15 +324,34 @@ function layer(value: unknown, path: string, budget: { points: number }): Layer 
 }
 
 function generator(value: unknown, path: string): TextureGenerator {
-  const type = tag(value, path, "type", ["randomDots", "colourNoise"]);
+  const at = (key: string) => join(path, key);
+  const type = tag(value, path, "type", [
+    "randomDots",
+    "colourNoise",
+    "fractalNoise",
+    "cells",
+    "scatteredShapes",
+  ]);
   switch (type) {
     case "randomDots": {
       const fields = object(value, path, ["type", "density"]);
-      return { type, density: number(fields.density, join(path, "density"), 0, 1) };
+      return { type, density: number(fields.density, at("density"), 0, 1) };
     }
     case "colourNoise":
       object(value, path, ["type"]);
       return { type };
+    case "fractalNoise": {
+      const fields = object(value, path, ["type", "octaves"]);
+      return { type, octaves: integer(fields.octaves, at("octaves"), 1, 6) };
+    }
+    case "cells": {
+      const fields = object(value, path, ["type", "shading"]);
+      return { type, shading: number(fields.shading, at("shading"), 0, 1) };
+    }
+    case "scatteredShapes": {
+      const fields = object(value, path, ["type", "density"]);
+      return { type, density: number(fields.density, at("density"), 0, 1) };
+    }
     default:
       return unreachable(type);
   }

@@ -2,12 +2,7 @@ import { createRandom, deriveSeed } from "../random.ts";
 import type { TextureSpec } from "../recipe.ts";
 import { createGenerator } from "./generators.ts";
 import { PALETTE_LEVELS, paletteTable } from "./palette.ts";
-
-/**
- * Feature size at scale 1, as a fraction of the image height, so a texture looks the
- * same at preview and export resolutions.
- */
-const BASE_CELL = 1 / 400;
+import { BASE_CELL } from "./scale.ts";
 
 /**
  * The texture's colour at output pixel `(x, y)`, packed as `0xRRGGBBAA`, in the form

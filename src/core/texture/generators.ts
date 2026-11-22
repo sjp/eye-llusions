@@ -1,29 +1,9 @@
-import { mix32, type Random } from "../random.ts";
 import type { TextureGenerator } from "../recipe.ts";
-
-/**
- * A texture value from 0 to 1 at output pixel `(x, y)`; `x` is fractional when the
- * stereogram is oversampled. It is a pure function of its arguments, so values don't
- * depend on which pixels the renderer asks for or in what order.
- */
-export type ValueFunction = (x: number, y: number) => number;
-
-type GeneratorContext = {
-  /** The texture's own random sub-stream. */
-  random: Random;
-  /** Output size in pixels. */
-  width: number;
-  height: number;
-  /** Feature size in output pixels, at least 1. */
-  cellSize: number;
-};
-
-/** A uniformly distributed unsigned 32-bit hash of a cell, keyed by the seed. */
-function cellHash(key: number, cx: number, cy: number): number {
-  return mix32((mix32((key ^ cx) >>> 0) + cy) >>> 0);
-}
-
-const UINT32_RANGE = 0x1_0000_0000;
+import { voronoiCells } from "./cells.ts";
+import { cellHash, UINT32_RANGE, type GeneratorContext, type ValueFunction } from "./context.ts";
+import { fractalNoise } from "./noise.ts";
+import { FEATURE_CELLS } from "./scale.ts";
+import { scatteredShapes } from "./shapes.ts";
 
 /** Two-tone dots: a `density` fraction of cells take value 1, the rest 0. */
 function randomDots(density: number, { random, cellSize }: GeneratorContext): ValueFunction {
@@ -39,6 +19,10 @@ function colourNoise({ random, cellSize }: GeneratorContext): ValueFunction {
   return (x, y) => cellHash(key, Math.floor(x / cellSize), Math.floor(y / cellSize)) / UINT32_RANGE;
 }
 
+function keys(random: GeneratorContext["random"], count: number): number[] {
+  return Array.from({ length: count }, () => random.uint32());
+}
+
 function unknownGenerator(generator: never): never {
   throw new RangeError(`Unknown generator ${JSON.stringify(generator)}`);
 }
@@ -52,6 +36,28 @@ export function createGenerator(
       return randomDots(generator.density, context);
     case "colourNoise":
       return colourNoise(context);
+    case "fractalNoise":
+      return fractalNoise(
+        keys(context.random, generator.octaves),
+        FEATURE_CELLS.fractalNoise * context.cellSize,
+      );
+    case "cells": {
+      const [points, values] = keys(context.random, 2);
+      return voronoiCells(
+        points,
+        values,
+        FEATURE_CELLS.cells * context.cellSize,
+        generator.shading,
+      );
+    }
+    case "scatteredShapes": {
+      const [glyph, ...background] = keys(context.random, 3);
+      return scatteredShapes(
+        { glyph, background },
+        FEATURE_CELLS.scatteredShapes * context.cellSize,
+        generator.density,
+      );
+    }
     default:
       return unknownGenerator(generator);
   }
