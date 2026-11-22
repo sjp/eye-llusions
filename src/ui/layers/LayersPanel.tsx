@@ -1,7 +1,7 @@
 import { useSignal, type Signal } from "@preact/signals";
 import { useId, useState } from "preact/hooks";
 import { RECIPE_LIMITS } from "../../core/parseRecipe.ts";
-import type { Layer } from "../../core/recipe.ts";
+import type { Asset, Layer } from "../../core/recipe.ts";
 import type { Editor } from "../../state/editor.ts";
 import {
   canAddLayer,
@@ -27,7 +27,7 @@ const BLEND_MODES: readonly { value: BlendMode; label: string }[] = [
   { value: "replace", label: "Replace" },
 ];
 
-type EditOptions = { coalesce?: string };
+type EditOptions = { coalesce?: string; assets?: Record<string, Asset> };
 type CommonPatch = Partial<Pick<Layer, "name" | "visible" | "blend" | "depth">>;
 type AddableKind = Pick<LayerKind<Layer>, "label" | "create">;
 
@@ -41,10 +41,11 @@ function sameKind<L extends Layer>(layer: Layer, like: L): layer is L {
   return layer.kind === like.kind;
 }
 
-function coalesceKey(layer: Layer, options: EditOptions): EditOptions {
-  return options.coalesce === undefined
-    ? {}
-    : { coalesce: `layer.${layer.id}.${options.coalesce}` };
+function layerEditOptions(layer: Layer, { coalesce, assets }: EditOptions): EditOptions {
+  return {
+    ...(coalesce === undefined ? {} : { coalesce: `layer.${layer.id}.${coalesce}` }),
+    ...(assets === undefined ? {} : { assets }),
+  };
 }
 
 /** The kind's own settings, with edits applied to the layer by ID. */
@@ -58,13 +59,13 @@ function kindEditor<L extends Layer>(kind: LayerKind<L> | undefined, layer: L, e
         changeLayer(layers, layer.id, (each) =>
           sameKind(each, layer) ? { ...each, ...patch } : each,
         ),
-      coalesceKey(layer, options),
+      layerEditOptions(layer, options),
     );
   };
   const commit = (): void => {
     editor.endEdit();
   };
-  return <kind.Editor layer={layer} change={change} commit={commit} />;
+  return <kind.Editor layer={layer} recipe={editor.recipe.value} change={change} commit={commit} />;
 }
 
 function KindSettings({ editor, layer }: { editor: Editor; layer: Layer }) {
@@ -175,7 +176,7 @@ function LayerSettings({ editor, layer }: { editor: Editor; layer: Layer }) {
   const change = (patch: CommonPatch, options: EditOptions = {}): void => {
     editor.updateLayers(
       (layers) => changeLayer(layers, layer.id, (each) => ({ ...each, ...patch })),
-      coalesceKey(layer, options),
+      layerEditOptions(layer, options),
     );
   };
   const commit = (): void => {
@@ -259,7 +260,7 @@ export function LayersPanel({
   const roomy = canAddLayer(layers);
 
   const add = (kind: AddableKind): void => {
-    const fresh = kind.create();
+    const fresh = kind.create(editor.recipe.value);
     const layer = {
       ...fresh,
       id: freeLayerId(layers, fresh.kind),

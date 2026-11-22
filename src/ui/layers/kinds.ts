@@ -1,16 +1,21 @@
 import type { FunctionComponent } from "preact";
-import type { Layer } from "../../core/recipe.ts";
+import { freeAssetId } from "../../core/assets.ts";
+import type { Asset, Layer, Recipe } from "../../core/recipe.ts";
 import { DrawingEditor, DrawingIcon } from "../drawing/DrawingEditor.tsx";
+import { ImageEditor, ImageIcon } from "./ImageEditor.tsx";
 import { SampleEditor, SampleIcon } from "./SampleEditor.tsx";
 import { TextEditor, TextIcon } from "./TextEditor.tsx";
 
-type EditOptions = { coalesce?: string };
+type EditOptions = { coalesce?: string; assets?: Record<string, Asset> };
 
 export type LayerEditorProps<L extends Layer> = {
   layer: L;
+  /** The whole recipe, for kinds that use its assets. */
+  recipe: Recipe;
   /**
    * Applies `patch` to the layer as one undoable edit. Edits that pass the same
-   * `coalesce` key merge into one undo step until `commit` is called.
+   * `coalesce` key merge into one undo step until `commit` is called. `assets` are
+   * added to the recipe in the same edit.
    */
   change: (patch: Partial<L>, options?: EditOptions) => void;
   /** Ends a coalesced edit. */
@@ -23,7 +28,7 @@ export type LayerKind<L extends Layer> = {
   label: string;
   Icon: FunctionComponent;
   /** A new layer with default settings; the panel makes `id` and `name` unique. */
-  create: () => L;
+  create: (recipe: Recipe) => L;
   /** The settings specific to this kind. */
   Editor: FunctionComponent<LayerEditorProps<L>>;
 };
@@ -80,5 +85,25 @@ export const LAYER_KINDS: Registry = {
       strokes: [],
     }),
     Editor: DrawingEditor,
+  },
+  image: {
+    label: "Image",
+    Icon: ImageIcon,
+    create: (recipe) => ({
+      kind: "image",
+      id: "image",
+      name: "Image",
+      visible: true,
+      blend: "max",
+      depth: 1,
+      asset: freeAssetId(recipe, "image"),
+      fit: "contain",
+      invert: false,
+      levels: { black: 0, white: 1 },
+      blur: 0,
+      posterize: null,
+      threshold: null,
+    }),
+    Editor: ImageEditor,
   },
 };
