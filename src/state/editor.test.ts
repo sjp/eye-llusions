@@ -1,6 +1,6 @@
 import { effect } from "@preact/signals";
 import { describe, expect, test } from "vitest";
-import { defaultRecipe } from "../core/recipe.ts";
+import { defaultRecipe, type Asset, type ImageLayer } from "../core/recipe.ts";
 import { Editor } from "./editor.ts";
 
 describe("Editor", () => {
@@ -74,5 +74,31 @@ describe("Editor", () => {
     editor.undo();
     stop();
     expect(seen).toEqual([8, 12, 8]);
+  });
+
+  test("layer updates add assets and drop ones no layer uses", () => {
+    const pixel: Asset = { format: "gray", width: 1, height: 1, data: new Uint8Array([9]) };
+    const layer: ImageLayer = {
+      kind: "image",
+      id: "image-1",
+      name: "Image",
+      visible: true,
+      blend: "max",
+      depth: 1,
+      asset: "photo",
+      fit: "contain",
+      invert: false,
+      levels: { black: 0, white: 1 },
+      blur: 0,
+      posterize: null,
+      threshold: null,
+    };
+    const editor = new Editor();
+    editor.updateLayers((layers) => [...layers, layer], { assets: { photo: pixel } });
+    expect(editor.recipe.value.assets).toEqual({ photo: pixel });
+    editor.updateLayers((layers) => layers.slice(0, 1));
+    expect(editor.recipe.value.assets).toEqual({});
+    editor.undo();
+    expect(editor.recipe.value.assets.photo).toBe(pixel);
   });
 });

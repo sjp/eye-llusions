@@ -1,5 +1,6 @@
 import { batch, signal, type ReadonlySignal } from "@preact/signals";
-import { defaultRecipe, type Layer, type Recipe } from "../core/recipe.ts";
+import { pruneAssets } from "../core/assets.ts";
+import { defaultRecipe, type Asset, type Layer, type Recipe } from "../core/recipe.ts";
 import { History } from "./history.ts";
 
 type View = Recipe["view"];
@@ -53,11 +54,22 @@ export class Editor {
     this.#edit((recipe) => ({ ...recipe, texture: { ...recipe.texture, ...patch } }), options);
   }
 
-  /** Replaces the layer stack with `update`'s result; returning `layers` itself changes nothing. */
-  updateLayers(update: (layers: Layer[]) => Layer[], options: EditOptions = {}): void {
+  /**
+   * Replaces the layer stack with `update`'s result; returning `layers` itself changes
+   * nothing. `assets` are added alongside, and assets no layer uses any more are dropped.
+   */
+  updateLayers(
+    update: (layers: Layer[]) => Layer[],
+    options: EditOptions & { assets?: Record<string, Asset> } = {},
+  ): void {
     this.#edit((recipe) => {
       const layers = update(recipe.layers);
-      return layers === recipe.layers ? recipe : { ...recipe, layers };
+      if (layers === recipe.layers && options.assets === undefined) {
+        return recipe;
+      }
+      const assets =
+        options.assets === undefined ? recipe.assets : { ...recipe.assets, ...options.assets };
+      return pruneAssets({ ...recipe, layers, assets });
     }, options);
   }
 
