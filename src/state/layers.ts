@@ -1,0 +1,82 @@
+import { RECIPE_LIMITS } from "../core/parseRecipe.ts";
+import type { Layer } from "../core/recipe.ts";
+
+/** Whether the stack has room for another layer. */
+export function canAddLayer(layers: readonly Layer[]): boolean {
+  return layers.length < RECIPE_LIMITS.layers;
+}
+
+/** `${prefix}-N` with the smallest N ≥ 1 that no layer uses. */
+export function freeLayerId(layers: readonly Layer[], prefix: string): string {
+  const used = new Set(layers.map((layer) => layer.id));
+  for (let n = 1; ; n++) {
+    const id = `${prefix}-${String(n)}`;
+    if (!used.has(id)) {
+      return id;
+    }
+  }
+}
+
+/** `base`, or `base N` with the smallest N ≥ 2 that no layer uses, within the name limit. */
+export function freeLayerName(layers: readonly Layer[], base: string): string {
+  const used = new Set(layers.map((layer) => layer.name));
+  const clipped = base.slice(0, RECIPE_LIMITS.nameLength);
+  if (!used.has(clipped)) {
+    return clipped;
+  }
+  for (let n = 2; ; n++) {
+    const suffix = ` ${String(n)}`;
+    const name = base.slice(0, RECIPE_LIMITS.nameLength - suffix.length).trimEnd() + suffix;
+    if (!used.has(name)) {
+      return name;
+    }
+  }
+}
+
+/**
+ * Inserts `layer` directly above the layer with ID `above`, or at the top when there is
+ * no such layer. Returns `layers` unchanged when the stack is full.
+ */
+export function insertLayer(layers: Layer[], layer: Layer, above?: string): Layer[] {
+  if (!canAddLayer(layers)) {
+    return layers;
+  }
+  const index = layers.findIndex((each) => each.id === above);
+  const at = index === -1 ? layers.length : index + 1;
+  return [...layers.slice(0, at), layer, ...layers.slice(at)];
+}
+
+/** A copy of the layer with ID `id`, with a fresh ID and name, inserted above it. */
+export function duplicateLayer(layers: Layer[], id: string): Layer[] {
+  const original = layers.find((layer) => layer.id === id);
+  if (original === undefined) {
+    return layers;
+  }
+  const copy: Layer = {
+    ...structuredClone(original),
+    id: freeLayerId(layers, original.kind),
+    name: freeLayerName(layers, `${original.name} copy`),
+  };
+  return insertLayer(layers, copy, id);
+}
+
+export function removeLayer(layers: Layer[], id: string): Layer[] {
+  const index = layers.findIndex((layer) => layer.id === id);
+  return index === -1 ? layers : layers.toSpliced(index, 1);
+}
+
+/** Moves the layer with ID `id` to position `to` in the stack, clamped to its ends. */
+export function moveLayer(layers: Layer[], id: string, to: number): Layer[] {
+  const from = layers.findIndex((layer) => layer.id === id);
+  const target = Math.min(Math.max(to, 0), layers.length - 1);
+  if (from === -1 || from === target) {
+    return layers;
+  }
+  return layers.toSpliced(from, 1).toSpliced(target, 0, layers[from]);
+}
+
+/** Applies `change` to the layer with ID `id`. */
+export function changeLayer(layers: Layer[], id: string, change: (layer: Layer) => Layer): Layer[] {
+  const index = layers.findIndex((layer) => layer.id === id);
+  return index === -1 ? layers : layers.with(index, change(layers[index]));
+}

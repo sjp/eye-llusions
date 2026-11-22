@@ -58,6 +58,12 @@ describe("Editor", () => {
     expect(editor.recipe.value.layers).toHaveLength(1);
   });
 
+  test("a layer update that returns the same stack adds no undo step", () => {
+    const editor = new Editor();
+    editor.updateLayers((layers) => layers);
+    expect(editor.canUndo.value).toBe(false);
+  });
+
   test("notifies subscribers once per change", () => {
     const editor = new Editor();
     const seen: number[] = [];

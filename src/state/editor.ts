@@ -53,9 +53,12 @@ export class Editor {
     this.#edit((recipe) => ({ ...recipe, texture: { ...recipe.texture, ...patch } }), options);
   }
 
-  /** Replaces the layer stack with `update`'s result. */
+  /** Replaces the layer stack with `update`'s result; returning `layers` itself changes nothing. */
   updateLayers(update: (layers: Layer[]) => Layer[], options: EditOptions = {}): void {
-    this.#edit((recipe) => ({ ...recipe, layers: update(recipe.layers) }), options);
+    this.#edit((recipe) => {
+      const layers = update(recipe.layers);
+      return layers === recipe.layers ? recipe : { ...recipe, layers };
+    }, options);
   }
 
   newSeed(): void {
