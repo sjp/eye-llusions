@@ -1,6 +1,7 @@
 import { parseRecipe } from "../core/parseRecipe.ts";
 import type { Layer, Recipe, Stroke } from "../core/recipe.ts";
 import { STROKE_GRID } from "../core/strokes.ts";
+import { compress, decompress, fromBase64Url, toBase64Url } from "./bytes.ts";
 
 /** Bumped whenever the link payload changes in a way old decoders can't read. */
 const LINK_FORMAT = 1;
@@ -20,61 +21,6 @@ export class ShareLinkError extends Error {
 }
 
 const BROKEN = "This link is damaged or incomplete, so the shared scene couldn't be opened.";
-
-function streamOf(bytes: Uint8Array<ArrayBuffer>): ReadableStream<Uint8Array<ArrayBuffer>> {
-  return new ReadableStream({
-    start(controller) {
-      controller.enqueue(bytes);
-      controller.close();
-    },
-  });
-}
-
-/** Reads a whole stream, giving up once it passes `limit` bytes. */
-async function collect(
-  stream: ReadableStream<Uint8Array<ArrayBuffer>>,
-  limit = Infinity,
-): Promise<Uint8Array<ArrayBuffer>> {
-  const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
-    }
-    total += value.length;
-    if (total > limit) {
-      await reader.cancel();
-      throw new ShareLinkError(BROKEN);
-    }
-    chunks.push(value);
-  }
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    out.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return out;
-}
-
-function toBase64Url(bytes: Uint8Array): string {
-  let binary = "";
-  const CHUNK = 0x8000;
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    binary += String.fromCodePoint(...bytes.subarray(i, i + CHUNK));
-  }
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
-}
-
-function fromBase64Url(text: string): Uint8Array<ArrayBuffer> {
-  if (!/^[\w-]*$/.test(text) || text.length % 4 === 1) {
-    throw new ShareLinkError(BROKEN);
-  }
-  const binary = atob(text.replaceAll("-", "+").replaceAll("_", "/"));
-  return Uint8Array.from(binary, (char) => char.codePointAt(0) ?? 0);
-}
 
 /** Strokes on the drawing grid travel as integer steps between points, which compress well. */
 type PackedStroke = { brush: Stroke["brush"]; steps: number[] };
@@ -101,8 +47,14 @@ function isFields(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** The recipe without its assets, with drawing strokes packed to compress well. */
+export function packRecipe(recipe: Recipe): unknown {
+  const { assets: _assets, ...shared } = recipe;
+  return { ...shared, layers: shared.layers.map(packLayer) };
+}
+
 /** Expands packed strokes in place; anything malformed is left for parseRecipe to reject. */
-function unpackStrokes(input: unknown): void {
+export function unpackStrokes(input: unknown): void {
   if (!isFields(input) || !Array.isArray(input.layers)) {
     return;
   }
@@ -130,12 +82,8 @@ function unpackStrokes(input: unknown): void {
 
 /** The recipe without its assets, compressed into the text that follows `#r=`. */
 export async function encodeRecipe(recipe: Recipe): Promise<string> {
-  const { assets: _assets, ...shared } = recipe;
-  const packed = { ...shared, layers: shared.layers.map(packLayer) };
-  const json = new TextEncoder().encode(JSON.stringify(packed));
-  const compressed = await collect(
-    streamOf(json).pipeThrough(new CompressionStream("deflate-raw")),
-  );
+  const json = new TextEncoder().encode(JSON.stringify(packRecipe(recipe)));
+  const compressed = await compress(json, "deflate-raw");
   return `${String(LINK_FORMAT)}.${toBase64Url(compressed)}`;
 }
 
@@ -162,10 +110,7 @@ export async function decodeRecipe(payload: string): Promise<Recipe> {
   }
   let input: unknown;
   try {
-    const json = await collect(
-      streamOf(fromBase64Url(body)).pipeThrough(new DecompressionStream("deflate-raw")),
-      MAX_JSON_BYTES,
-    );
+    const json = await decompress(fromBase64Url(body), "deflate-raw", MAX_JSON_BYTES);
     input = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(json));
     unpackStrokes(input);
   } catch {
