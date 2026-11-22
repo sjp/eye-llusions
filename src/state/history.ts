@@ -50,6 +50,14 @@ export class History<T> {
     this.#future = [];
   }
 
+  /** Starts over from `value`, with nothing to undo or redo. */
+  reset(value: T): void {
+    this.#present = value;
+    this.#past.length = 0;
+    this.#future = [];
+    this.#openKey = undefined;
+  }
+
   seal(): void {
     this.#openKey = undefined;
   }

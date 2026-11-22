@@ -97,6 +97,21 @@ export class Editor {
     this.setTexture({ seed: this.#nextSeed() });
   }
 
+  /**
+   * Replaces the whole recipe, such as with a shared scene, as one undo step. With
+   * `fresh`, history starts over instead, so there is nothing to undo.
+   */
+  open(recipe: Recipe, { fresh = false }: { fresh?: boolean } = {}): void {
+    this.#history.seal();
+    if (fresh) {
+      this.#history.reset(recipe);
+    } else {
+      this.#history.push(recipe);
+      this.#history.seal();
+    }
+    this.#sync();
+  }
+
   /** Ends a coalesced edit, so the next change starts a new undo step. */
   endEdit(): void {
     this.#history.seal();

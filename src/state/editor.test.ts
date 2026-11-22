@@ -168,4 +168,23 @@ describe("Editor", () => {
     editor.undo();
     expect(editor.recipe.value.assets["tile-2"]).toBe(next);
   });
+
+  test("opening a recipe is one undo step, or starts history over when fresh", () => {
+    const editor = new Editor();
+    editor.setView({ repeats: 10 }, { coalesce: "repeats" });
+    const shared = { ...defaultRecipe(), seed: 42 };
+    editor.open(shared);
+    expect(editor.recipe.value).toBe(shared);
+    expect(editor.editing.value).toBe(false);
+    editor.undo();
+    expect(editor.recipe.value.view.repeats).toBe(10);
+    editor.redo();
+    expect(editor.recipe.value).toBe(shared);
+
+    const other = { ...defaultRecipe(), seed: 7 };
+    editor.open(other, { fresh: true });
+    expect(editor.recipe.value).toBe(other);
+    expect(editor.canUndo.value).toBe(false);
+    expect(editor.canRedo.value).toBe(false);
+  });
 });
