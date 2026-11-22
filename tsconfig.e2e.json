@@ -28,5 +28,5 @@
     "allowUnusedLabels": false,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["e2e", "playwright.config.ts", "src/test/smoke.ts"]
+  "include": ["e2e", "playwright.config.ts"]
 }
