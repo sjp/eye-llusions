@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
 import {
-  canAddAsset,
+  canReplaceAsset,
   freeAssetId,
+  newAssetId,
   missingAssets,
   pruneAssets,
   referencedAssets,
@@ -71,10 +72,36 @@ describe("freeAssetId", () => {
   });
 });
 
-test("canAddAsset stops at the recipe's asset limit", () => {
-  const assets = Object.fromEntries(
+describe("canReplaceAsset", () => {
+  const full = Object.fromEntries(
     Array.from({ length: RECIPE_LIMITS.assets }, (_, i) => [`a${String(i)}`, pixel]),
   );
-  expect(canAddAsset({ assets })).toBe(false);
-  expect(canAddAsset({ assets: {} })).toBe(true);
+
+  test("allows a new asset while there is room", () => {
+    expect(canReplaceAsset(recipe([image("a", "gone")], {}), "a")).toBe(true);
+  });
+
+  test("refuses a layer with a missing asset when the recipe is full", () => {
+    expect(canReplaceAsset(recipe([image("a", "gone")], full), "a")).toBe(false);
+  });
+
+  test("allows replacing an asset only this layer uses, even when full", () => {
+    expect(canReplaceAsset(recipe([image("a", "a0")], full), "a")).toBe(true);
+    expect(canReplaceAsset(recipe([image("a", "a0"), image("b", "a0")], full), "a")).toBe(false);
+  });
+
+  test("refuses layers that aren't images", () => {
+    expect(canReplaceAsset(defaultRecipe(), "sphere")).toBe(false);
+  });
+});
+
+describe("newAssetId", () => {
+  test("reuses a missing ID that only this layer uses", () => {
+    expect(newAssetId(recipe([image("a", "photo")], {}), "a")).toBe("photo");
+  });
+
+  test("picks a free ID when the asset is held or shared", () => {
+    expect(newAssetId(recipe([image("a", "photo")], { photo: pixel }), "a")).toBe("image-1");
+    expect(newAssetId(recipe([image("a", "photo"), image("b", "photo")], {}), "a")).toBe("image-1");
+  });
 });

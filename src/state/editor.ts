@@ -56,7 +56,8 @@ export class Editor {
 
   /**
    * Replaces the layer stack with `update`'s result; returning `layers` itself changes
-   * nothing. `assets` are added alongside, and assets no layer uses any more are dropped.
+   * nothing. `assets` are added with the new stack, and assets no layer uses any more are
+   * dropped.
    */
   updateLayers(
     update: (layers: Layer[]) => Layer[],
@@ -64,7 +65,7 @@ export class Editor {
   ): void {
     this.#edit((recipe) => {
       const layers = update(recipe.layers);
-      if (layers === recipe.layers && options.assets === undefined) {
+      if (layers === recipe.layers) {
         return recipe;
       }
       const assets =

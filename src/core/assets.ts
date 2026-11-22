@@ -35,9 +35,38 @@ export function pruneAssets(recipe: Recipe): Recipe {
   };
 }
 
-/** Whether the recipe can hold one more asset. */
-export function canAddAsset(recipe: Pick<Recipe, "assets">): boolean {
-  return Object.keys(recipe.assets).length < RECIPE_LIMITS.assets;
+/** Whether image layer `layerId` can take a new asset without the recipe exceeding its limit. */
+export function canReplaceAsset(
+  recipe: Pick<Recipe, "layers" | "assets">,
+  layerId: string,
+): boolean {
+  const layer = recipe.layers.find((each) => each.id === layerId);
+  if (layer?.kind !== "image") {
+    return false;
+  }
+  const shared = recipe.layers.some(
+    (each) => each !== layer && each.kind === "image" && each.asset === layer.asset,
+  );
+  const freed = Object.hasOwn(recipe.assets, layer.asset) && !shared ? 1 : 0;
+  return Object.keys(recipe.assets).length - freed < RECIPE_LIMITS.assets;
+}
+
+/**
+ * The ID for a new asset on image layer `layerId`: its current ID when that is missing
+ * and no other layer uses it, otherwise a free one, so other layers keep their images.
+ */
+export function newAssetId(recipe: Pick<Recipe, "layers" | "assets">, layerId: string): string {
+  const layer = recipe.layers.find((each) => each.id === layerId);
+  if (
+    layer?.kind === "image" &&
+    !Object.hasOwn(recipe.assets, layer.asset) &&
+    !recipe.layers.some(
+      (each) => each !== layer && each.kind === "image" && each.asset === layer.asset,
+    )
+  ) {
+    return layer.asset;
+  }
+  return freeAssetId(recipe, "image");
 }
 
 /** `${prefix}-N` with the smallest N ≥ 1 that is neither held nor referenced. */
