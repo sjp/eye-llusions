@@ -214,6 +214,7 @@ describe("parseRecipe clamps finite numbers into range", () => {
     ["aspect", -3, 0.2],
     ["view.repeats", 1e9, 32],
     ["view.depthOfField", 0, 0.05],
+    ["view.depthOfField", 1, 0.9],
     ["layers.0.depth", 1.5, 1],
     ["layers.0.shape.rings", 1000, 32],
     ["layers.1.center", { x: -9, y: 9 }, { x: -0.5, y: 1.5 }],
