@@ -1,4 +1,4 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { RenderClient } from "../render/client.ts";
 import type { RenderOutput } from "../render/protocol.ts";
 import { Editor } from "../state/editor.ts";
@@ -7,6 +7,8 @@ import { LayersPanel, TexturePanel } from "./PlaceholderPanels.tsx";
 import { Preview, type Renderer } from "./Preview.tsx";
 import { Segmented } from "./Segmented.tsx";
 import { useUndoShortcuts } from "./useUndoShortcuts.ts";
+import { useViewMode } from "./useViewMode.ts";
+import { Viewer } from "./Viewer.tsx";
 import { ViewPanel } from "./ViewPanel.tsx";
 
 const OUTPUTS = [
@@ -42,13 +44,33 @@ export function App({ editor: givenEditor, renderer: givenRenderer }: Props) {
   const renderer = useRenderer(givenRenderer);
   const [output, setOutput] = useState<RenderOutput>("stereogram");
   const [snap, setSnap] = useState<SheetSnap>("peek");
+  const [help, setHelp] = useState(true);
+  const { viewing, enter, exit } = useViewMode();
+  const viewButton = useRef<HTMLButtonElement>(null);
+  const wasViewing = useRef(false);
   useUndoShortcuts(editor);
+
+  useEffect(() => {
+    if (wasViewing.current && !viewing) {
+      viewButton.current?.focus();
+    }
+    wasViewing.current = viewing;
+  }, [viewing]);
+
+  if (viewing) {
+    return (
+      <Viewer editor={editor} renderer={renderer} onExit={exit} help={help} onHelp={setHelp} />
+    );
+  }
 
   return (
     <div class="shell" data-sheet={snap}>
       <header class="toolbar">
         <h1>Eye-llusion</h1>
         <div class="toolbar-actions">
+          <button ref={viewButton} type="button" class="button" onClick={enter}>
+            View
+          </button>
           <button
             type="button"
             class="button"

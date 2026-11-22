@@ -102,4 +102,16 @@ describe("App", () => {
     fireEvent.click(handle);
     expect(handle.getAttribute("aria-expanded")).toBe("false");
   });
+
+  test("View opens the viewer and going back closes it", async () => {
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: "View" }));
+    expect(screen.getByRole("dialog", { name: "Viewer" })).toBeTruthy();
+    expect(screen.queryByRole("complementary", { name: "Controls" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Exit" }));
+    await vi.waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Viewer" })).toBeNull();
+    });
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "View" }));
+  });
 });
