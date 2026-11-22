@@ -1,0 +1,149 @@
+import { describe, expect, test } from "vitest";
+import { renderStereogram, type StereogramOptions } from "./stereogram.ts";
+
+const WIDTH = 400;
+const HEIGHT = 4;
+const REPEATS = 8;
+const MU = 1 / 3;
+/** Eye separation in pixels. */
+const EYE = (2 * WIDTH) / REPEATS;
+const FAR_PERIOD = EYE / 2;
+const NEAR_PERIOD = Math.round(((1 - MU) * EYE) / (2 - MU));
+
+/** A distinct opaque colour for every sample position in a row. */
+function uniqueSample(x: number, y: number): number {
+  const index = Math.round(x * 4);
+  return (((index & 0xff) << 24) | (((index >> 8) & 0xff) << 16) | ((y & 0xff) << 8) | 0xff) >>> 0;
+}
+
+function render(
+  depth: Float32Array,
+  overrides: Partial<StereogramOptions> = {},
+): Uint8ClampedArray {
+  return renderStereogram({
+    depth,
+    width: WIDTH,
+    height: HEIGHT,
+    repeats: REPEATS,
+    depthOfField: MU,
+    mode: "wall",
+    oversample: 1,
+    sample: uniqueSample,
+    ...overrides,
+  });
+}
+
+function pixel(image: Uint8ClampedArray, x: number, y: number, width = WIDTH): number {
+  const i = (y * width + x) * 4;
+  return ((image[i] << 24) | (image[i + 1] << 16) | (image[i + 2] << 8) | image[i + 3]) >>> 0;
+}
+
+function flat(value: number): Float32Array {
+  return new Float32Array(WIDTH * HEIGHT).fill(value);
+}
+
+/** Depth 0 everywhere except a near rectangle covering columns [x0, x1). */
+function withRect(x0: number, x1: number): Float32Array {
+  const depth = flat(0);
+  for (let y = 0; y < HEIGHT; y++) {
+    depth.fill(1, y * WIDTH + x0, y * WIDTH + x1);
+  }
+  return depth;
+}
+
+function smallestPeriod(image: Uint8ClampedArray, y: number): number {
+  for (let period = 1; period < WIDTH; period++) {
+    let periodic = true;
+    for (let x = 0; x + period < WIDTH && periodic; x++) {
+      periodic = pixel(image, x, y) === pixel(image, x + period, y);
+    }
+    if (periodic) {
+      return period;
+    }
+  }
+  return WIDTH;
+}
+
+describe("renderStereogram", () => {
+  test("repeats exactly with half the eye separation over a flat far plane", () => {
+    const image = render(flat(0));
+    for (let y = 0; y < HEIGHT; y++) {
+      expect(smallestPeriod(image, y)).toBe(FAR_PERIOD);
+    }
+  });
+
+  test("repeats with a shorter period over a nearer flat plane", () => {
+    const image = render(flat(1));
+    expect(NEAR_PERIOD).toBeLessThan(FAR_PERIOD);
+    for (let y = 0; y < HEIGHT; y++) {
+      expect(smallestPeriod(image, y)).toBe(NEAR_PERIOD);
+    }
+  });
+
+  test("links pixels by the near separation inside a raised square", () => {
+    const image = render(withRect(150, 250));
+    const half = NEAR_PERIOD / 2;
+    for (let y = 0; y < HEIGHT; y++) {
+      for (let x = 150; x < 250; x++) {
+        expect(pixel(image, x - half, y)).toBe(pixel(image, x + half, y));
+      }
+      for (let x = 0; x + FAR_PERIOD < 140; x++) {
+        expect(pixel(image, x, y)).toBe(pixel(image, x + FAR_PERIOD, y));
+      }
+    }
+  });
+
+  test("leaves background hidden behind a near edge unconstrained", () => {
+    const image = render(withRect(150, 250));
+    // Seen from the left eye, the point just right of the square is behind it.
+    const centre = 252;
+    expect(pixel(image, centre - FAR_PERIOD / 2, 0)).not.toBe(
+      pixel(image, centre + FAR_PERIOD / 2, 0),
+    );
+  });
+
+  test("inverts the depth in cross-eyed mode", () => {
+    const depth = new Float32Array(WIDTH * HEIGHT);
+    for (let i = 0; i < depth.length; i++) {
+      depth[i] = ((i * 7919) % 101) / 100;
+    }
+    const inverted = depth.map((d) => 1 - d);
+    expect(render(depth, { mode: "cross" })).toEqual(render(inverted));
+
+    const background = render(flat(0), { mode: "cross" });
+    expect(smallestPeriod(background, 0)).toBe(NEAR_PERIOD);
+  });
+
+  test("is deterministic and fills a given output buffer", () => {
+    const depth = withRect(100, 300);
+    const out = new Uint8ClampedArray(WIDTH * HEIGHT * 4);
+    const first = render(depth, { out });
+    expect(first).toBe(out);
+    expect(render(depth)).toEqual(first);
+  });
+
+  test("copies free pixels from the sampler", () => {
+    const image = render(flat(0));
+    for (let x = WIDTH - FAR_PERIOD; x < WIDTH; x++) {
+      expect(pixel(image, x, 2)).toBe(uniqueSample(x, 2));
+    }
+  });
+
+  test("averages oversampled pixels down to the output width", () => {
+    const image = render(flat(0), { oversample: 2 });
+    expect(image.length).toBe(WIDTH * HEIGHT * 4);
+    expect(smallestPeriod(image, 1)).toBe(FAR_PERIOD);
+
+    const grey = render(flat(0), {
+      oversample: 4,
+      sample: (x) => (Math.round(x * 4) % 2 === 0 ? 0x000000ff : 0x646464ff),
+    });
+    expect([...grey.subarray(0, 4)]).toEqual([50, 50, 50, 255]);
+  });
+
+  test("rejects inconsistent sizes", () => {
+    expect(() => render(new Float32Array(10))).toThrow(RangeError);
+    expect(() => render(flat(0), { out: new Uint8ClampedArray(4) })).toThrow(RangeError);
+    expect(() => render(flat(0), { oversample: 1.5 })).toThrow(RangeError);
+  });
+});
