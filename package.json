@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "check": "oxlint --deny-warnings --report-unused-disable-directives && oxfmt --check && node scripts/unused-exports.mjs",
     "fmt": "oxfmt",
+    "figures": "node scripts/generate-figures.mjs",
     "test": "vitest run --passWithNoTests",
     "test:perf": "vitest run --config vitest.perf.config.ts --passWithNoTests",
     "test:browser": "playwright test"
