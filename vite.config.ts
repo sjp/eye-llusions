@@ -69,6 +69,8 @@ export default defineConfig({
   plugins: [preact({ reactAliasesEnabled: false }), contentSecurityPolicy()],
   // Module workers keep the render worker a single same-origin file.
   worker: { format: "es" },
+  // Never inline assets such as fonts as data: URLs, which the CSP blocks.
+  build: { assetsInlineLimit: 0 },
   // Agent worktrees live under .claude/; keep their copies of the tests out of the run.
   // e2e/ is reserved for Playwright browser tests, and *.perf.test.ts holds the
   // frame-timing tests, run one file at a time by `npm run test:perf`.
