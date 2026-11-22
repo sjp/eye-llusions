@@ -6,10 +6,12 @@ import { configDefaults, defineConfig } from "vitest/config";
 /**
  * Content-Security-Policy for the built site. GitHub Pages can't send headers, so it
  * goes in a <meta> tag (which can't express frame-ancestors, report-uri or sandbox).
- * The build has no inline scripts and no data: or blob: subresources: the recording
- * download is a blob: link navigation, which CSP doesn't govern. style-src needs no
- * 'unsafe-inline': the UI's inline styles (the slider fill, the bottom sheet's height)
- * are set through the DOM's style object, which the policy doesn't restrict.
+ * The build has no inline scripts and no data: or blob: subresources: uploaded images
+ * are decoded with createImageBitmap and drawn to a canvas rather than shown through
+ * blob: URLs, and the PNG download is a blob: link navigation, which CSP doesn't
+ * govern. script-src also covers the render worker, so it must be a same-origin file.
+ * style-src needs no 'unsafe-inline': the UI's inline styles (such as the preview's
+ * size) are set through the DOM's style object, which the policy doesn't restrict.
  */
 const CSP = [
   "default-src 'self'",
@@ -48,8 +50,8 @@ function contentSecurityPolicy(): Plugin {
 export const CACHE_DIR = fileURLToPath(new URL("node_modules/.vite", import.meta.url));
 
 /**
- * The instant every unit test's fake clock starts at (2026-03-14 15:09:26 UTC, the
- * same as the browser captures), so no test depends on when it runs.
+ * The instant every unit test's fake clock starts at (2026-03-14 15:09:26 UTC), so no
+ * test depends on when it runs.
  */
 const TEST_TIME = Date.UTC(2026, 2, 14, 15, 9, 26);
 
@@ -66,8 +68,8 @@ export default defineConfig({
   // would hide a stray react import instead of failing the build.
   plugins: [preact({ reactAliasesEnabled: false }), contentSecurityPolicy()],
   // Agent worktrees live under .claude/; keep their copies of the tests out of the run.
-  // e2e/ holds the Playwright browser tests, run by `npm run test:browser`, and
-  // *.perf.test.ts the frame-timing tests, run one file at a time by `npm run test:perf`.
+  // e2e/ is reserved for Playwright browser tests, and *.perf.test.ts holds the
+  // frame-timing tests, run one file at a time by `npm run test:perf`.
   // src/test/setup.ts puts every test on fake timers starting at TEST_TIME.
   test: {
     exclude: [...configDefaults.exclude, ...TEST_EXCLUDE, "**/*.perf.test.ts"],
