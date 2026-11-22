@@ -1,9 +1,13 @@
 import type { Layer, Recipe } from "../recipe.ts";
 import type { LayerField, RasterContext, Rasteriser, RasteriserRegistry } from "./raster.ts";
+import { rasteriseDrawing } from "./drawing.ts";
 import { rasteriseSample } from "./sample.ts";
 
 /** Rasterisers that need nothing beyond plain TypeScript. */
-export const CORE_RASTERISERS: RasteriserRegistry = { sample: rasteriseSample };
+export const CORE_RASTERISERS: RasteriserRegistry = {
+  sample: rasteriseSample,
+  drawing: rasteriseDrawing,
+};
 
 /** Runs a rasteriser if there is one, resolving to whether the layer was drawn. */
 function run<L>(
