@@ -3,7 +3,7 @@ import type { LayerField, RasterContext, Rasteriser, RasteriserRegistry } from "
 import { rasteriseSample } from "./sample.ts";
 
 /** Rasterisers that need nothing beyond plain TypeScript. */
-const CORE_RASTERISERS: RasteriserRegistry = { sample: rasteriseSample };
+export const CORE_RASTERISERS: RasteriserRegistry = { sample: rasteriseSample };
 
 /** Runs a rasteriser if there is one, resolving to whether the layer was drawn. */
 function run<L>(
