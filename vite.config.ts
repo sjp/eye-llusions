@@ -71,6 +71,7 @@ export default defineConfig({
   // src/test/setup.ts puts every test on fake timers starting at TEST_TIME.
   test: {
     exclude: [...configDefaults.exclude, ...TEST_EXCLUDE, "**/*.perf.test.ts"],
+    environment: "happy-dom",
     setupFiles: ["src/test/setup.ts"],
     fakeTimers: { now: TEST_TIME },
   },
