@@ -67,6 +67,8 @@ export default defineConfig({
   // No react -> preact/compat aliases: the app imports preact directly, and an alias
   // would hide a stray react import instead of failing the build.
   plugins: [preact({ reactAliasesEnabled: false }), contentSecurityPolicy()],
+  // Module workers keep the render worker a single same-origin file.
+  worker: { format: "es" },
   // Agent worktrees live under .claude/; keep their copies of the tests out of the run.
   // e2e/ is reserved for Playwright browser tests, and *.perf.test.ts holds the
   // frame-timing tests, run one file at a time by `npm run test:perf`.
