@@ -1,5 +1,5 @@
 import { RECIPE_LIMITS } from "../core/parseRecipe.ts";
-import type { Layer } from "../core/recipe.ts";
+import type { Layer, Stroke } from "../core/recipe.ts";
 
 /** Whether the stack has room for another layer. */
 export function canAddLayer(layers: readonly Layer[]): boolean {
@@ -79,4 +79,38 @@ export function moveLayer(layers: Layer[], id: string, to: number): Layer[] {
 export function changeLayer(layers: Layer[], id: string, change: (layer: Layer) => Layer): Layer[] {
   const index = layers.findIndex((layer) => layer.id === id);
   return index === -1 ? layers : layers.with(index, change(layers[index]));
+}
+
+/** The layer with ID `id`, or the top layer if there is none. */
+export function selectedLayer(layers: readonly Layer[], id: string | undefined): Layer | undefined {
+  return layers.find((layer) => layer.id === id) ?? layers.at(-1);
+}
+
+/**
+ * How many more points a new stroke on drawing layer `id` may have within the recipe's
+ * caps: 0 when the layer has its most strokes.
+ */
+export function strokeRoom(layers: readonly Layer[], id: string): number {
+  let points = 0;
+  let strokes = 0;
+  for (const layer of layers) {
+    if (layer.kind === "drawing") {
+      for (const stroke of layer.strokes) {
+        points += stroke.points.length / 2;
+      }
+      if (layer.id === id) {
+        strokes = layer.strokes.length;
+      }
+    }
+  }
+  return strokes >= RECIPE_LIMITS.strokesPerLayer
+    ? 0
+    : Math.max(0, Math.min(RECIPE_LIMITS.pointsPerStroke, RECIPE_LIMITS.pointsTotal - points));
+}
+
+/** Adds `stroke` to the top of drawing layer `id`. */
+export function addStroke(layers: Layer[], id: string, stroke: Stroke): Layer[] {
+  return changeLayer(layers, id, (layer) =>
+    layer.kind === "drawing" ? { ...layer, strokes: [...layer.strokes, stroke] } : layer,
+  );
 }

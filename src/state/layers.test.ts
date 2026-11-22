@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
 import { RECIPE_LIMITS } from "../core/parseRecipe.ts";
-import { defaultRecipe, type Layer } from "../core/recipe.ts";
+import { defaultRecipe, type DrawingLayer, type Layer, type Stroke } from "../core/recipe.ts";
 import {
+  addStroke,
   canAddLayer,
   changeLayer,
   duplicateLayer,
@@ -10,6 +11,8 @@ import {
   insertLayer,
   moveLayer,
   removeLayer,
+  selectedLayer,
+  strokeRoom,
 } from "./layers.ts";
 
 function layer(id: string, name = id): Layer {
@@ -77,5 +80,57 @@ describe("layer stack operations", () => {
     expect(result.map((each) => each.visible)).toEqual([true, false]);
     expect(result[0]).toBe(layers[0]);
     expect(changeLayer(layers, "missing", (each) => each)).toBe(layers);
+  });
+});
+
+function drawing(id: string, strokes: Stroke[] = []): DrawingLayer {
+  return {
+    kind: "drawing",
+    id,
+    name: id,
+    visible: true,
+    blend: "max",
+    depth: 1,
+    strokes,
+  };
+}
+
+function strokeOf(points: number): Stroke {
+  return {
+    brush: { size: 0.1, softness: 0, mode: "set", value: 1 },
+    points: Array.from({ length: points * 2 }, () => 0.5),
+  };
+}
+
+describe("selection and strokes", () => {
+  test("the selected layer falls back to the top one", () => {
+    const layers = [layer("a"), layer("b")];
+    expect(selectedLayer(layers, "a")?.id).toBe("a");
+    expect(selectedLayer(layers, "gone")?.id).toBe("b");
+    expect(selectedLayer([], undefined)).toBeUndefined();
+  });
+
+  test("adds strokes to drawing layers only", () => {
+    const layers: Layer[] = [layer("a"), drawing("d")];
+    const added = addStroke(layers, "d", strokeOf(2));
+    expect(added[1]).toMatchObject({ strokes: [strokeOf(2)] });
+    expect(addStroke(layers, "a", strokeOf(2))[0]).toBe(layers[0]);
+  });
+
+  test("stroke room counts points across the recipe and strokes on the layer", () => {
+    expect(strokeRoom([drawing("d")], "d")).toBe(RECIPE_LIMITS.pointsPerStroke);
+    const busy = [
+      drawing("d"),
+      drawing(
+        "e",
+        Array.from({ length: 12 }, () => strokeOf(4000)),
+      ),
+    ];
+    expect(strokeRoom(busy, "d")).toBe(RECIPE_LIMITS.pointsTotal - 48_000);
+    const full = drawing(
+      "d",
+      Array.from({ length: RECIPE_LIMITS.strokesPerLayer }, () => strokeOf(1)),
+    );
+    expect(strokeRoom([full], "d")).toBe(0);
   });
 });
