@@ -118,6 +118,23 @@ describe("the share dialog", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
+  test("a scene shared with images still asks before going to the gallery", async () => {
+    stubNavigator({ clipboard: { writeText: () => Promise.resolve() }, share: undefined });
+    const { editor } = setup();
+    editor.updateLayers((layers) => [...layers, imageLayer()], {
+      assets: { "image-1": { format: "gray", width: 1, height: 1, data: new Uint8Array(1) } },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    await screen.findByRole("textbox", { name: "Link" });
+    fireEvent.click(screen.getByRole("button", { name: "Copy link" }));
+    await screen.findByText("Link copied.");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Gallery" }));
+    const dialog = screen.getByRole("dialog", { name: "Leave this scene?" });
+    expect(dialog.textContent).toContain("link leaves out the images");
+  });
+
   test("warns that images stay behind and that very long links may be cut", async () => {
     const share = vi.fn<(data: ShareData) => Promise<void>>(() => Promise.resolve());
     stubNavigator({ share });

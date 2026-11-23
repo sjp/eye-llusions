@@ -261,7 +261,7 @@ export function App({
               setDialog("save");
             }}
             onShared={() => {
-              editor.markSaved();
+              editor.markSaved({ withAssets: false });
             }}
           />
         )}
@@ -270,7 +270,7 @@ export function App({
             recipe={editor.recipe.value}
             exportPng={exportPng}
             onSaved={() => {
-              editor.markSaved();
+              editor.markSaved({ withAssets: true });
             }}
             onClose={() => {
               setDialog(undefined);
@@ -280,6 +280,7 @@ export function App({
         )}
         {dialog === "leave" && (
           <LeaveDialog
+            imagesOnly={editor.imagesUnsaved.value}
             onLeave={leave}
             onStay={() => {
               setDialog(undefined);

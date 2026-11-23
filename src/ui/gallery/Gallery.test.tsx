@@ -107,7 +107,7 @@ describe("the gallery", () => {
     const { editor } = setup();
     fireEvent.click(screen.getByRole("button", { name: "Start from blank" }));
     editor.newSeed();
-    editor.markSaved();
+    editor.markSaved({ withAssets: true });
     fireEvent.click(screen.getByRole("button", { name: "Gallery" }));
     expect(screen.queryByRole("dialog", { name: "Leave this scene?" })).toBeNull();
     expect(screen.getByRole("button", { name: "Start from blank" })).toBeTruthy();

@@ -1,12 +1,14 @@
 import { useEffect, useId, useRef } from "preact/hooks";
 
 type Props = {
+  /** The scene was shared by a link, which leaves its images out. */
+  imagesOnly?: boolean;
   onLeave: () => void;
   onStay: () => void;
 };
 
 /** Asks before leaving a scene whose changes haven't been shared or saved. */
-export function LeaveDialog({ onLeave, onStay }: Props) {
+export function LeaveDialog({ imagesOnly = false, onLeave, onStay }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -30,7 +32,9 @@ export function LeaveDialog({ onLeave, onStay }: Props) {
     >
       <h2 id={titleId}>Leave this scene?</h2>
       <p class="panel-note">
-        It has changes you haven't shared or saved. To keep them, share a link or save a PNG first.
+        {imagesOnly
+          ? "Its link leaves out the images. To keep them, save a PNG first."
+          : "It has changes you haven't shared or saved. To keep them, share a link or save a PNG first."}
       </p>
       <div class="share-actions">
         <button type="button" class="button" onClick={onLeave}>

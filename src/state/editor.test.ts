@@ -196,7 +196,7 @@ describe("Editor", () => {
     editor.undo();
     expect(editor.modified.value).toBe(false);
     editor.redo();
-    editor.markSaved();
+    editor.markSaved({ withAssets: true });
     expect(editor.modified.value).toBe(false);
     editor.undo();
     expect(editor.modified.value).toBe(true);
@@ -204,6 +204,33 @@ describe("Editor", () => {
     editor.open({ ...defaultRecipe(), seed: 42 });
     expect(editor.modified.value).toBe(false);
     editor.undo();
+    expect(editor.modified.value).toBe(true);
+  });
+
+  test("a scene with images shared without them still counts as modified", () => {
+    const editor = new Editor();
+    editor.markSaved({ withAssets: false });
+    expect(editor.modified.value).toBe(false);
+
+    const pixel: Asset = { format: "gray", width: 1, height: 1, data: new Uint8Array(1) };
+    editor.updateLayers(() => [imageLayer("image-1")], { assets: { "image-1": pixel } });
+    editor.markSaved({ withAssets: false });
+    expect(editor.modified.value).toBe(true);
+    expect(editor.imagesUnsaved.value).toBe(true);
+
+    editor.markSaved({ withAssets: true });
+    expect(editor.modified.value).toBe(false);
+    expect(editor.imagesUnsaved.value).toBe(false);
+    editor.markSaved({ withAssets: false });
+    expect(editor.modified.value).toBe(false);
+
+    editor.setView({ repeats: 10 });
+    expect(editor.modified.value).toBe(true);
+    expect(editor.imagesUnsaved.value).toBe(false);
+    editor.markSaved({ withAssets: false });
+    expect(editor.imagesUnsaved.value).toBe(true);
+    editor.updateLayers(() => []);
+    expect(editor.imagesUnsaved.value).toBe(false);
     expect(editor.modified.value).toBe(true);
   });
 });

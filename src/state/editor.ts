@@ -30,8 +30,11 @@ export class Editor {
   readonly #canRedo = signal(false);
   readonly #editing = signal(false);
   readonly #modified = signal(false);
+  readonly #imagesUnsaved = signal(false);
   /** The recipe as last opened, shared or saved. */
   #saved: Recipe;
+  /** Whether `#saved` was kept with its images, rather than shared by a link without them. */
+  #savedWithAssets = true;
   readonly #nextSeed: () => number;
 
   readonly recipe: ReadonlySignal<Recipe>;
@@ -39,8 +42,13 @@ export class Editor {
   readonly canRedo: ReadonlySignal<boolean>;
   /** True while a coalesced edit, such as a slider drag, is under way. */
   readonly editing: ReadonlySignal<boolean>;
-  /** True when the recipe differs from the one last opened, shared or saved. */
+  /**
+   * True when leaving would lose something: the recipe differs from the one last opened,
+   * shared or saved, or it was only shared by a link, which leaves its images out.
+   */
   readonly modified: ReadonlySignal<boolean>;
+  /** True when the only thing leaving would lose is images a shared link left out. */
+  readonly imagesUnsaved: ReadonlySignal<boolean>;
 
   constructor(initial: Recipe = defaultRecipe(), nextSeed: () => number = randomSeed) {
     this.#history = new History(initial);
@@ -52,6 +60,7 @@ export class Editor {
     this.canRedo = this.#canRedo;
     this.editing = this.#editing;
     this.modified = this.#modified;
+    this.imagesUnsaved = this.#imagesUnsaved;
   }
 
   /** The texture scale follows the strip width into its fusible range. */
@@ -117,12 +126,19 @@ export class Editor {
       this.#history.seal();
     }
     this.#saved = this.#history.present;
+    this.#savedWithAssets = true;
     this.#sync();
   }
 
-  /** Records the current recipe as shared or saved, so it no longer counts as modified. */
-  markSaved(): void {
+  /**
+   * Records the current recipe as shared or saved, so it no longer counts as modified.
+   * Without `withAssets`, as for a link, a recipe holding images still counts as modified,
+   * unless it was already kept with them.
+   */
+  markSaved({ withAssets }: { withAssets: boolean }): void {
+    const kept = this.#history.present === this.#saved && this.#savedWithAssets;
     this.#saved = this.#history.present;
+    this.#savedWithAssets = withAssets || kept;
     this.#sync();
   }
 
@@ -153,7 +169,11 @@ export class Editor {
       this.#canUndo.value = this.#history.canUndo;
       this.#canRedo.value = this.#history.canRedo;
       this.#editing.value = this.#history.coalescing;
-      this.#modified.value = this.#history.present !== this.#saved;
+      const changed = this.#history.present !== this.#saved;
+      const imagesLost =
+        !changed && !this.#savedWithAssets && Object.keys(this.#saved.assets).length > 0;
+      this.#modified.value = changed || imagesLost;
+      this.#imagesUnsaved.value = imagesLost;
     });
   }
 }
