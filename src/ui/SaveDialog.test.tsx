@@ -118,7 +118,11 @@ describe("the save dialog", () => {
       expect(clicked).toEqual(["eye-llusion-1920x1080.png blob:test"]);
     });
     expect(editor.modified.value).toBe(false);
-    expect(exporter).toHaveBeenCalledWith(editor.recipe.value, { width: 1920, height: 1080 });
+    expect(exporter).toHaveBeenCalledWith(
+      editor.recipe.value,
+      { width: 1920, height: 1080 },
+      expect.any(AbortSignal),
+    );
     expect(created).toHaveBeenCalledOnce();
     vi.advanceTimersByTime(60_000);
     expect(revoked).toHaveBeenCalledWith("blob:test");
@@ -154,6 +158,30 @@ describe("the save dialog", () => {
     expect(screen.getByRole<HTMLButtonElement>("button", { name: "Download" }).disabled).toBe(
       false,
     );
+  });
+
+  test("closing mid-export aborts it and starts no download", async () => {
+    const created = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:test");
+    let finish: (blob: Blob) => void = () => undefined;
+    const { editor, exporter } = setup(
+      () =>
+        new Promise<Blob>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    editor.newSeed();
+    openSave();
+    fireEvent.click(screen.getByRole("button", { name: "Download" }));
+    const signal = exporter.mock.calls[0][2];
+    expect(signal?.aborted).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog", { name: "Save PNG" })).toBeNull();
+    expect(signal?.aborted).toBe(true);
+
+    finish(new Blob([plainPng()]));
+    await vi.runAllTimersAsync();
+    expect(created).not.toHaveBeenCalled();
+    expect(editor.modified.value).toBe(true);
   });
 
   test("opens from the share dialog when the link can't carry the scene", () => {

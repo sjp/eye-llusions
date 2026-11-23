@@ -4,8 +4,11 @@ import { embedProject } from "../state/projectFile.ts";
 
 type Size = { width: number; height: number };
 
-/** Renders the recipe at `size` into a PNG file that holds the whole project. */
-export type ExportPng = (recipe: Recipe, size: Size) => Promise<Blob>;
+/**
+ * Renders the recipe at `size` into a PNG file that holds the whole project. Aborting
+ * `signal` stops the work and rejects.
+ */
+export type ExportPng = (recipe: Recipe, size: Size, signal?: AbortSignal) => Promise<Blob>;
 
 async function encodePng(image: RenderImage): Promise<Blob> {
   const { width, height } = image;
@@ -43,19 +46,29 @@ async function encodePng(image: RenderImage): Promise<Blob> {
 
 /**
  * Renders in a worker of its own, so the preview's renders can't cancel the export,
- * and stops the worker as soon as the picture is back.
+ * and stops the worker as soon as the picture is back or the export is aborted.
  */
-export const renderPng: ExportPng = async (recipe, size) => {
+export const renderPng: ExportPng = async (recipe, size, signal) => {
+  signal?.throwIfAborted();
   const client = new RenderClient();
+  const stop = (): void => {
+    client.dispose();
+  };
+  signal?.addEventListener("abort", stop);
   let image: RenderImage;
   try {
     image = await client.render(recipe, size);
   } finally {
+    signal?.removeEventListener("abort", stop);
     client.dispose();
   }
   try {
+    signal?.throwIfAborted();
     const png = new Uint8Array(await (await encodePng(image)).arrayBuffer());
-    return new Blob([await embedProject(png, recipe)], { type: "image/png" });
+    signal?.throwIfAborted();
+    const blob = new Blob([await embedProject(png, recipe)], { type: "image/png" });
+    signal?.throwIfAborted();
+    return blob;
   } finally {
     if (!(image instanceof ImageData)) {
       image.close();

@@ -51,7 +51,8 @@ export function SaveDialog({ recipe, onClose, exportPng, onSaved }: Props) {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status | undefined>(undefined);
   const [canShare] = useState(canShareFiles);
-  const mounted = useRef(true);
+  const [aborter] = useState(() => new AbortController());
+  const { signal } = aborter;
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -59,9 +60,9 @@ export function SaveDialog({ recipe, onClose, exportPng, onSaved }: Props) {
       dialog.showModal();
     }
     return () => {
-      mounted.current = false;
+      aborter.abort();
     };
-  }, []);
+  }, [aborter]);
 
   const preset = EXPORT_PRESETS.find((each) => each.id === choice);
   const size =
@@ -81,16 +82,16 @@ export function SaveDialog({ recipe, onClose, exportPng, onSaved }: Props) {
     setBusy(true);
     setStatus({ tone: "info", text: "Making the PNG…" });
     try {
-      const blob = await exportPng(recipe, size);
+      const blob = await exportPng(recipe, size, signal);
       const name = `eye-llusion-${String(size.width)}x${String(size.height)}.png`;
       const file = new File([blob], name, { type: "image/png" });
-      if (mounted.current) {
+      if (!signal.aborted) {
         setMade({ recipe, ...size, file });
         setStatus(undefined);
       }
       return file;
     } catch {
-      if (mounted.current) {
+      if (!signal.aborted) {
         setStatus({
           tone: "error",
           text: "The PNG couldn't be made. Try a smaller size.",
@@ -98,7 +99,7 @@ export function SaveDialog({ recipe, onClose, exportPng, onSaved }: Props) {
       }
       return undefined;
     } finally {
-      if (mounted.current) {
+      if (!signal.aborted) {
         setBusy(false);
       }
     }
@@ -106,7 +107,7 @@ export function SaveDialog({ recipe, onClose, exportPng, onSaved }: Props) {
 
   const download = async (): Promise<void> => {
     const file = await make();
-    if (file !== undefined) {
+    if (file !== undefined && !signal.aborted) {
       downloadBlob(file, file.name);
       onSaved?.();
     }
@@ -115,7 +116,7 @@ export function SaveDialog({ recipe, onClose, exportPng, onSaved }: Props) {
   const share = async (): Promise<void> => {
     const fresh = ready === undefined;
     const file = await make();
-    if (file === undefined) {
+    if (file === undefined || signal.aborted) {
       return;
     }
     try {
