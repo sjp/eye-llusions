@@ -66,6 +66,24 @@ describe("Viewer", () => {
     expect(screen.getByText("This image is made for cross-eyed viewing.")).toBeTruthy();
   });
 
+  test("the instructions cover only the image's viewing method", () => {
+    setup("cross");
+    const help = screen.getByRole("region", { name: "How to view" });
+    expect(help.textContent).toContain("Hold a fingertip");
+    expect(help.textContent).not.toContain("look through it");
+  });
+
+  test("the troubleshooting tips switch the viewing method as an undoable step", () => {
+    const { editor } = setup("wall");
+    expect(screen.getByText("Can't see it?")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Switch to cross-eyed" }));
+    expect(editor.recipe.value.view.mode).toBe("cross");
+    expect(screen.getByText("This image is made for cross-eyed viewing.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Switch to wall-eyed" })).toBeTruthy();
+    editor.undo();
+    expect(editor.recipe.value.view.mode).toBe("wall");
+  });
+
   test("both buttons close the open instructions", () => {
     const { onHelp } = setup();
     fireEvent.click(screen.getByRole("button", { name: "Got it" }));

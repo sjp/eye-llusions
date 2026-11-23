@@ -110,27 +110,78 @@ function PeekButton({ peeking, onPeek }: { peeking: boolean; onPeek: (on: boolea
   );
 }
 
-const HOW_TO = {
-  wall: "This image is made for wall-eyed viewing.",
-  cross: "This image is made for cross-eyed viewing.",
-} as const;
+type Mode = "wall" | "cross";
 
-function HowTo({ mode, onClose }: { mode: "wall" | "cross"; onClose: () => void }) {
+const OTHER: Record<Mode, Mode> = { wall: "cross", cross: "wall" };
+
+const MODE_NAME: Record<Mode, string> = { wall: "wall-eyed", cross: "cross-eyed" };
+
+const HOW_TO: Record<Mode, string> = {
+  wall:
+    "Bring your face close to the screen and look through it, as if at something far away. " +
+    "Move back slowly, keeping your eyes relaxed, until the two dots become three and the " +
+    "hidden shape appears.",
+  cross:
+    "Hold a fingertip between your eyes and the screen and focus on it, moving it until the " +
+    "two dots behind it become three. Then let your gaze rest on the image.",
+};
+
+const DISTANCE: Record<Mode, string> = {
+  wall:
+    "Start with your nose almost touching the screen and move back very slowly. The shape " +
+    "often appears 30 to 50 cm away.",
+  cross:
+    "Sit back, about an arm's length away. Crossing is easier from further back, and the " +
+    "strips look narrower.",
+};
+
+const RELAX: Record<Mode, string> = {
+  wall:
+    "Don't try to focus on the pattern. Let your eyes go soft, blink, and give it a minute: " +
+    "the shape often snaps into place all at once.",
+  cross:
+    "Cross only a little, just until the dots become three, then hold still and wait for the " +
+    "shape to sharpen.",
+};
+
+type HowToProps = {
+  mode: Mode;
+  /** Estimated far-plane strip width, in millimetres. */
+  stripMm: number;
+  onClose: () => void;
+  onSwitchMode: () => void;
+};
+
+function HowTo({ mode, stripMm, onClose, onSwitchMode }: HowToProps) {
   const titleId = useId();
   return (
     <section class="viewer-help" aria-labelledby={titleId}>
       <h2 id={titleId}>How to view</h2>
+      <p>This image is made for {MODE_NAME[mode]} viewing.</p>
       <p>{HOW_TO[mode]}</p>
-      <p>
-        <strong>Wall-eyed:</strong> bring your face close to the screen and look through it, as if
-        at something far away. Move back slowly, keeping your eyes relaxed, until the two dots
-        become three and the hidden shape appears.
-      </p>
-      <p>
-        <strong>Cross-eyed:</strong> hold a fingertip between your eyes and the screen and focus on
-        it, moving it until the two dots behind it become three. Then let your gaze rest on the
-        image.
-      </p>
+      <details class="viewer-trouble">
+        <summary>Can't see it?</summary>
+        <ul>
+          <li>
+            <strong>Distance:</strong> {DISTANCE[mode]}
+          </li>
+          <li>
+            <strong>Relax:</strong> {RELAX[mode]}
+          </li>
+          <li>
+            <strong>Strip size:</strong> the strips here are about {Math.round(stripMm)} mm wide.
+            Strips 20 to 40 mm wide are easiest, and wall-eyed viewing can't join strips wider than
+            the gap between your eyes. The Phone and Monitor buttons resize them.
+          </li>
+          <li>
+            <strong>Try {MODE_NAME[OTHER[mode]]}:</strong> some people find one way much easier than
+            the other.{" "}
+            <button type="button" class="button" onClick={onSwitchMode}>
+              Switch to {MODE_NAME[OTHER[mode]]}
+            </button>
+          </li>
+        </ul>
+      </details>
       <button type="button" class="button" onClick={onClose}>
         Got it
       </button>
@@ -215,20 +266,34 @@ export function Viewer({ editor, renderer, onExit, help, onHelp }: Props) {
           How to view
         </button>
       </div>
-      <div class="viewer-area" ref={areaRef}>
-        <div class="viewer-picture" style={{ width: `${String(width)}px` }}>
-          <div class="viewer-dots" aria-hidden="true">
-            <span class="viewer-dot" style={{ left: `calc(50% - ${String(strip / 2)}px)` }} />
-            <span class="viewer-dot" style={{ left: `calc(50% + ${String(strip / 2)}px)` }} />
-          </div>
-          <div class="viewer-frame" style={{ height: `${String(height)}px` }}>
-            <Preview
-              editor={editor}
-              renderer={renderer}
-              output={peeking ? "depth" : "stereogram"}
-            />
+      <div class="viewer-stage">
+        <div class="viewer-area" ref={areaRef}>
+          <div class="viewer-picture" style={{ width: `${String(width)}px` }}>
+            <div class="viewer-dots" aria-hidden="true">
+              <span class="viewer-dot" style={{ left: `calc(50% - ${String(strip / 2)}px)` }} />
+              <span class="viewer-dot" style={{ left: `calc(50% + ${String(strip / 2)}px)` }} />
+            </div>
+            <div class="viewer-frame" style={{ height: `${String(height)}px` }}>
+              <Preview
+                editor={editor}
+                renderer={renderer}
+                output={peeking ? "depth" : "stereogram"}
+              />
+            </div>
           </div>
         </div>
+        {help ? (
+          <HowTo
+            mode={view.mode}
+            stripMm={stripMm}
+            onClose={() => {
+              onHelp(false);
+            }}
+            onSwitchMode={() => {
+              editor.setView({ mode: OTHER[view.mode] });
+            }}
+          />
+        ) : null}
       </div>
       <div class="viewer-guide">
         <p>
@@ -239,14 +304,6 @@ export function Viewer({ editor, renderer, onExit, help, onHelp }: Props) {
           {advice}
         </p>
       </div>
-      {help ? (
-        <HowTo
-          mode={view.mode}
-          onClose={() => {
-            onHelp(false);
-          }}
-        />
-      ) : null}
     </div>
   );
 }

@@ -55,6 +55,28 @@ test("the viewer fills the screen and the Exit button leaves it", async ({ page 
   await expect(page.getByRole("region", { name: "How to view" })).toBeHidden();
 });
 
+test("the instructions leave the hint in sight and help people who can't see it", async ({
+  page,
+}) => {
+  const { viewer } = await openViewer(page);
+  const help = page.getByRole("region", { name: "How to view" });
+  const hint = viewer.getByText("until you see three dots");
+  await expect(help).toContainText("look through it");
+  await expect(help).not.toContainText("fingertip");
+  await expect(async () => {
+    const [panel, line] = [await box(help), await box(hint)];
+    expect(panel.y + panel.height).toBeLessThanOrEqual(line.y);
+  }).toPass();
+  await expect(hint).toBeInViewport({ ratio: 1 });
+
+  await help.getByText("Can't see it?").click();
+  await expect(help).toContainText(/strips here are about \d+ mm wide/);
+  await help.getByRole("button", { name: "Switch to cross-eyed" }).click();
+  await expect(viewer.getByText("Cross your eyes until you see three dots")).toBeVisible();
+  await expect(help).toContainText("fingertip");
+  await expect(help.getByRole("button", { name: "Switch to wall-eyed" })).toBeVisible();
+});
+
 test("Escape closes the instructions, then leaves the viewer", async ({ page }) => {
   const { viewer } = await openViewer(page);
   await page.keyboard.press("Escape");

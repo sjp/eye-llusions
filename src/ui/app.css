@@ -443,6 +443,12 @@ h2 {
   color: #000;
 }
 
+.viewer-stage {
+  position: relative;
+  display: grid;
+  min-height: 0;
+}
+
 .viewer-area {
   display: grid;
   place-items: center;
@@ -483,13 +489,14 @@ h2 {
   color: var(--fg);
 }
 
+/* Over the picture only, so the controls and the hint below stay in sight. */
 .viewer-help {
   position: absolute;
-  right: max(16px, env(safe-area-inset-right));
-  bottom: max(16px, env(safe-area-inset-bottom));
-  left: max(16px, env(safe-area-inset-left));
+  right: 8px;
+  bottom: 0;
+  left: 8px;
   max-width: 480px;
-  max-height: calc(100% - 32px);
+  max-height: 100%;
   margin: 0 auto;
   overflow-y: auto;
   padding: 16px;
@@ -504,6 +511,43 @@ h2 {
 
 .viewer-help p {
   margin: 8px 0;
+}
+
+.viewer-trouble {
+  margin: 8px 0 12px;
+}
+
+.viewer-trouble summary {
+  min-height: var(--target);
+  display: flex;
+  align-items: center;
+  list-style: none;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.viewer-trouble summary::-webkit-details-marker {
+  display: none;
+}
+
+.viewer-trouble summary::before {
+  content: "▸";
+  margin-right: 8px;
+}
+
+.viewer-trouble[open] summary::before {
+  content: "▾";
+}
+
+.viewer-trouble ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.viewer-trouble .button {
+  margin-top: 8px;
 }
 
 /* Layers */

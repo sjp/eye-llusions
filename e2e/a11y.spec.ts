@@ -46,6 +46,8 @@ test("the viewer and its instructions have no accessibility violations", async (
   await expect(viewer.locator(".preview-canvas")).toHaveAttribute("data-quality", "full");
   await expect(page.getByRole("region", { name: "How to view" })).toBeVisible();
   await expectAccessible(page);
+  await page.getByText("Can't see it?").click();
+  await expectAccessible(page);
   await page.getByRole("button", { name: "Got it" }).click();
   await expectAccessible(page);
 });
