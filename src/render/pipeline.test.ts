@@ -77,4 +77,33 @@ describe("renderPixels", () => {
     const second = await renderPixels(defaultRecipe(), request({}), CORE_RASTERISERS);
     expect(second).toEqual(first);
   });
+
+  test("pauses between layers and bands of rows without changing the pixels", async () => {
+    const wide = request({ width: 2048, height: 96 });
+    const whole = await renderPixels(defaultRecipe(), wide, CORE_RASTERISERS);
+    let pauses = 0;
+    const paused = await renderPixels(defaultRecipe(), wide, CORE_RASTERISERS, undefined, () => {
+      pauses++;
+      return Promise.resolve();
+    });
+    expect(paused).toEqual(whole);
+    // One layer, then three bands of 32 rows.
+    expect(pauses).toBe(4);
+  });
+
+  test("stops when the pause throws", async () => {
+    let pauses = 0;
+    const result = renderPixels(
+      defaultRecipe(),
+      request({ width: 2048, height: 96 }),
+      CORE_RASTERISERS,
+      undefined,
+      () => {
+        pauses++;
+        return pauses === 3 ? Promise.reject(new Error("cancelled")) : Promise.resolve();
+      },
+    );
+    await expect(result).rejects.toThrow("cancelled");
+    expect(pauses).toBe(3);
+  });
 });
