@@ -33,7 +33,7 @@ function setupWithHelp() {
     );
   }
   render(<Harness />);
-  return { onExit };
+  return { editor, onExit };
 }
 
 describe("Viewer", () => {
@@ -82,6 +82,28 @@ describe("Viewer", () => {
     expect(screen.getByRole("button", { name: "Switch to wall-eyed" })).toBeTruthy();
     editor.undo();
     expect(editor.recipe.value.view.mode).toBe("wall");
+  });
+
+  test("the practice image shows in place of the scene, which it leaves alone", () => {
+    const { editor } = setupWithHelp();
+    const before = editor.recipe.value;
+    fireEvent.click(screen.getByRole("button", { name: "Try a practice image" }));
+    expect(screen.queryByRole("region", { name: "How to view" })).toBeNull();
+    const end = screen.getByRole("button", { name: "End practice" });
+    expect(document.activeElement).toBe(end);
+    expect(screen.getByText(/Practice image: look for/)).toBeTruthy();
+    expect(editor.recipe.value).toBe(before);
+    expect(editor.canUndo.value).toBe(false);
+
+    // Practice in the help is offered only for the scene.
+    fireEvent.click(screen.getByRole("button", { name: "How to view" }));
+    expect(screen.queryByRole("button", { name: "Try a practice image" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Got it" }));
+
+    fireEvent.click(end);
+    expect(screen.queryByRole("button", { name: "End practice" })).toBeNull();
+    expect(screen.queryByText(/Practice image/)).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "How to view" }));
   });
 
   test("both buttons close the open instructions", () => {

@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "preact/hooks";
 import { previewDisplaySize } from "../render/resolution.ts";
-import type { Editor } from "../state/editor.ts";
+import { Editor } from "../state/editor.ts";
+import { PRACTICE_TARGET, practiceRecipe } from "./practice.ts";
 import { Preview, type Renderer } from "./Preview.tsx";
 import {
   cssPixelsToMillimetres,
@@ -150,9 +151,11 @@ type HowToProps = {
   stripMm: number;
   onClose: () => void;
   onSwitchMode: () => void;
+  /** Shows the practice image; left out while it is showing. */
+  onPractice: (() => void) | undefined;
 };
 
-function HowTo({ mode, stripMm, onClose, onSwitchMode }: HowToProps) {
+function HowTo({ mode, stripMm, onClose, onSwitchMode, onPractice }: HowToProps) {
   const titleId = useId();
   return (
     <section class="viewer-help" aria-labelledby={titleId}>
@@ -175,11 +178,20 @@ function HowTo({ mode, stripMm, onClose, onSwitchMode }: HowToProps) {
           </li>
           <li>
             <strong>Try {MODE_NAME[OTHER[mode]]}:</strong> some people find one way much easier than
-            the other.{" "}
+            the other.
             <button type="button" class="button" onClick={onSwitchMode}>
               Switch to {MODE_NAME[OTHER[mode]]}
             </button>
           </li>
+          {onPractice === undefined ? null : (
+            <li>
+              <strong>Practise:</strong> learn on an easy image with one bold shape and strong
+              depth.
+              <button type="button" class="button" onClick={onPractice}>
+                Try a practice image
+              </button>
+            </li>
+          )}
         </ul>
       </details>
       <button type="button" class="button" onClick={onClose}>
@@ -193,13 +205,17 @@ function HowTo({ mode, stripMm, onClose, onSwitchMode }: HowToProps) {
  * The distraction-free viewer: the stereogram as large as the screen allows, with
  * alignment dots one far-plane strip apart above it and help for seeing it.
  */
-export function Viewer({ editor, renderer, onExit, help, onHelp }: Props) {
+export function Viewer({ editor: scene, renderer, onExit, help, onHelp }: Props) {
   const areaRef = useRef<HTMLDivElement>(null);
   const exitRef = useRef<HTMLButtonElement>(null);
   const helpRef = useRef<HTMLButtonElement>(null);
+  const endPracticeRef = useRef<HTMLButtonElement>(null);
   const area = useSize(areaRef);
   const [context] = useState(viewingContext);
   const [peeking, setPeeking] = useState(false);
+  /** The practice image, shown instead of the scene without touching it. */
+  const [practice, setPractice] = useState<Editor | undefined>(undefined);
+  const editor = practice ?? scene;
   const { aspect, view } = editor.recipe.value;
 
   useEffect(() => {
@@ -213,6 +229,15 @@ export function Viewer({ editor, renderer, onExit, help, onHelp }: Props) {
       helpRef.current?.focus();
     }
   }, [help]);
+
+  const practising = practice !== undefined;
+  const wasPractising = useRef(practising);
+  useEffect(() => {
+    if (practising !== wasPractising.current) {
+      (practising ? endPracticeRef : helpRef).current?.focus();
+    }
+    wasPractising.current = practising;
+  }, [practising]);
 
   const width = Math.max(0, Math.min(area.width, (area.height - DOT_ROW) * aspect));
   const height = width / aspect;
@@ -231,6 +256,18 @@ export function Viewer({ editor, renderer, onExit, help, onHelp }: Props) {
         <button ref={exitRef} type="button" class="button" onClick={onExit}>
           Exit
         </button>
+        {practising ? (
+          <button
+            ref={endPracticeRef}
+            type="button"
+            class="button"
+            onClick={() => {
+              setPractice(undefined);
+            }}
+          >
+            End practice
+          </button>
+        ) : null}
         <PeekButton peeking={peeking} onPeek={setPeeking} />
         <div class="viewer-presets" role="group" aria-label="Size the pattern for">
           <button
@@ -275,6 +312,7 @@ export function Viewer({ editor, renderer, onExit, help, onHelp }: Props) {
             </div>
             <div class="viewer-frame" style={{ height: `${String(height)}px` }}>
               <Preview
+                key={practising ? "practice" : "scene"}
                 editor={editor}
                 renderer={renderer}
                 output={peeking ? "depth" : "stereogram"}
@@ -292,10 +330,22 @@ export function Viewer({ editor, renderer, onExit, help, onHelp }: Props) {
             onSwitchMode={() => {
               editor.setView({ mode: OTHER[view.mode] });
             }}
+            onPractice={
+              practising
+                ? undefined
+                : () => {
+                    const repeats = width > 0 ? presetRepeats(context, width) : view.repeats;
+                    setPractice(new Editor(practiceRecipe(view.mode, repeats)));
+                    onHelp(false);
+                  }
+            }
           />
         ) : null}
       </div>
       <div class="viewer-guide">
+        {practising ? (
+          <p class="viewer-practice">Practice image: look for {PRACTICE_TARGET}.</p>
+        ) : null}
         <p>
           {view.mode === "wall" ? "Relax" : "Cross"} your eyes until you see three dots.{" "}
           <span class="viewer-strip">Strips are about {Math.round(stripMm)} mm wide.</span>

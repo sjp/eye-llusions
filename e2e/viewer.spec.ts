@@ -77,6 +77,32 @@ test("the instructions leave the hint in sight and help people who can't see it"
   await expect(help.getByRole("button", { name: "Switch to wall-eyed" })).toBeVisible();
 });
 
+test("a practice image can be tried from the help without changing the scene", async ({ page }) => {
+  const { viewer, canvas } = await openViewer(page);
+  const help = page.getByRole("region", { name: "How to view" });
+  await help.getByText("Can't see it?").click();
+  await canvas.evaluate((element: HTMLCanvasElement) => {
+    element.dataset["scene"] = "";
+  });
+  await help.getByRole("button", { name: "Try a practice image" }).click();
+  await expect(help).toBeHidden();
+  // A picture of its own, not the scene's.
+  await expect(canvas).not.toHaveAttribute("data-scene");
+  const end = viewer.getByRole("button", { name: "End practice" });
+  await expect(end).toBeFocused();
+  await expect(viewer.getByText(/Practice image: look for the word HI/)).toBeVisible();
+  await expect(viewer.locator(".preview-canvas")).toHaveAttribute("data-quality", "full");
+  // Sized for this screen with the preset for its kind.
+  await viewer.getByRole("button", { name: "Monitor" }).click();
+  await end.click();
+  await expect(end).toBeHidden();
+  await expect(canvas).toHaveAttribute("data-quality", "full");
+  await viewer.getByRole("button", { name: "Exit" }).click();
+  await expectCreate(page);
+  await expect(page.getByRole("slider", { name: "Repeats" })).toHaveValue("8");
+  await expect(page.getByRole("button", { name: "Undo" })).toBeDisabled();
+});
+
 test("Escape closes the instructions, then leaves the viewer", async ({ page }) => {
   const { viewer } = await openViewer(page);
   await page.keyboard.press("Escape");
