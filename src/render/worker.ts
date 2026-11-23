@@ -15,8 +15,25 @@ const rasterisers: RasteriserRegistry = {
 
 const assets = new Map<string, Asset>();
 const depthCache = createDepthCache();
-/** Reused while results go out as bitmaps, which copy it; ImageData results take it. */
-let buffer: Uint8ClampedArray<ArrayBuffer> | undefined;
+/**
+ * Pixel buffers by length, most recent first: one each for drafts and full renders.
+ * Reused while results go out as bitmaps, which copy them; ImageData results take them.
+ */
+const buffers: Uint8ClampedArray<ArrayBuffer>[] = [];
+const BUFFERS = 2;
+
+function dropBuffer(buffer: Uint8ClampedArray<ArrayBuffer>): void {
+  const index = buffers.indexOf(buffer);
+  if (index !== -1) {
+    buffers.splice(index, 1);
+  }
+}
+
+function keepBuffer(buffer: Uint8ClampedArray<ArrayBuffer>): void {
+  dropBuffer(buffer);
+  buffers.unshift(buffer);
+  buffers.length = Math.min(buffers.length, BUFFERS);
+}
 
 async function toImage(
   pixels: Uint8ClampedArray<ArrayBuffer>,
@@ -30,13 +47,13 @@ async function toImage(
         premultiplyAlpha: "none",
         colorSpaceConversion: "none",
       });
-      buffer = pixels;
+      keepBuffer(pixels);
       return bitmap;
     } catch {
       // Fall back to ImageData below.
     }
   }
-  buffer = undefined;
+  dropBuffer(pixels);
   return data;
 }
 
@@ -50,7 +67,7 @@ const enqueue = createRenderQueue(
       recipe,
       request,
       rasterisers,
-      buffer,
+      buffers.find((buffer) => buffer.length === request.width * request.height * 4),
       pause,
       depthCache.composite,
     );
