@@ -136,6 +136,32 @@ describe("App", () => {
     expect(handle.getAttribute("aria-expanded")).toBe("false");
   });
 
+  test("the keyboard cycles and steps the sheet through every height", () => {
+    setup();
+    const handle = screen.getByRole("button", { name: "Controls" });
+    const shown = () => document.querySelector(".shell")?.getAttribute("data-sheet");
+    const state = () =>
+      document.getElementById(handle.getAttribute("aria-describedby") ?? "")?.textContent;
+    expect(state()).toBe("Collapsed");
+    fireEvent.keyDown(handle, { key: "Enter" });
+    expect(shown()).toBe("half");
+    expect(state()).toBe("Half open");
+    fireEvent.keyDown(handle, { key: " " });
+    expect(shown()).toBe("full");
+    expect(handle.getAttribute("aria-expanded")).toBe("true");
+    expect(state()).toBe("Fully open");
+    fireEvent.keyDown(handle, { key: "ArrowUp" });
+    expect(shown()).toBe("full");
+    fireEvent.keyDown(handle, { key: "Enter" });
+    expect(shown()).toBe("peek");
+    expect(handle.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.keyDown(handle, { key: "ArrowUp" });
+    fireEvent.keyDown(handle, { key: "ArrowUp" });
+    expect(shown()).toBe("full");
+    fireEvent.keyDown(handle, { key: "ArrowDown" });
+    expect(shown()).toBe("half");
+  });
+
   test("a cancelled drag on the sheet handle doesn't swallow the next press", () => {
     setup();
     const handle = screen.getByRole("button", { name: "Controls" });

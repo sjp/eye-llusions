@@ -10,6 +10,10 @@ export type SheetSnap = "peek" | "half" | "full";
 const PEEK_HEIGHT = 128;
 const SNAP_FRACTIONS = { half: 0.5, full: 0.88 } as const;
 
+const SNAPS: readonly SheetSnap[] = ["peek", "half", "full"];
+
+const SNAP_NAMES = { peek: "Collapsed", half: "Half open", full: "Fully open" } as const;
+
 /** Pointer travel, in CSS pixels, that turns a press on the handle into a drag. */
 const DRAG_THRESHOLD = 6;
 
@@ -46,13 +50,15 @@ function screenHeight(sheet: HTMLElement): number {
 
 /**
  * The controls: a side panel on wide screens and, on narrow ones, a bottom sheet that
- * can be dragged by its handle between resting heights, or toggled by pressing it.
+ * can be dragged by its handle between resting heights, or toggled by pressing it. From
+ * the keyboard, Enter and Space cycle through the heights and the arrow keys step them.
  */
 export function ControlSheet({ snap, onSnap, children }: Props) {
   const sheetRef = useRef<HTMLElement>(null);
   const drag = useRef<Drag | undefined>(undefined);
   const [dragging, setDragging] = useState(false);
   const bodyId = useId();
+  const stateId = useId();
 
   const end = (event: PointerEvent): void => {
     const current = drag.current;
@@ -84,6 +90,27 @@ export function ControlSheet({ snap, onSnap, children }: Props) {
         aria-label="Controls"
         aria-expanded={snap !== "peek"}
         aria-controls={bodyId}
+        aria-describedby={stateId}
+        onKeyDown={(event) => {
+          const at = SNAPS.indexOf(snap);
+          let next: number;
+          switch (event.key) {
+            case "Enter":
+            case " ":
+              next = (at + 1) % SNAPS.length;
+              break;
+            case "ArrowUp":
+              next = Math.min(at + 1, SNAPS.length - 1);
+              break;
+            case "ArrowDown":
+              next = Math.max(at - 1, 0);
+              break;
+            default:
+              return;
+          }
+          event.preventDefault();
+          onSnap(SNAPS[next]);
+        }}
         onPointerDown={(event) => {
           const sheet = sheetRef.current;
           if (sheet === null || event.button !== 0) {
@@ -126,6 +153,9 @@ export function ControlSheet({ snap, onSnap, children }: Props) {
         }}
       >
         <span class="sheet-grip" />
+        <span id={stateId} class="visually-hidden">
+          {SNAP_NAMES[snap]}
+        </span>
       </button>
       <div class="sheet-body" id={bodyId}>
         {children}

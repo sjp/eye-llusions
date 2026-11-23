@@ -111,6 +111,29 @@ test("narrow screens show a bottom sheet that drags open", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test("the keyboard moves the bottom sheet through every height", async ({ page }) => {
+  const { errors } = await open(page, { width: 390, height: 844 });
+  const sheet = page.getByRole("complementary", { name: "Controls" });
+  const handle = page.getByRole("button", { name: "Controls" });
+  await handle.focus();
+  await page.keyboard.press("Enter");
+  await expect(sheet).toHaveAttribute("data-snap", "half");
+  await page.keyboard.press("Space");
+  await expect(sheet).toHaveAttribute("data-snap", "full");
+  await expect(handle).toHaveAttribute("aria-expanded", "true");
+  await expect(handle).toHaveAccessibleDescription("Fully open");
+  await page.keyboard.press("ArrowDown");
+  await expect(sheet).toHaveAttribute("data-snap", "half");
+  await page.keyboard.press("ArrowDown");
+  await expect(sheet).toHaveAttribute("data-snap", "peek");
+  await expect(handle).toHaveAttribute("aria-expanded", "false");
+  await page.keyboard.press("Space");
+  await page.keyboard.press("Enter");
+  await expect(sheet).toHaveAttribute("data-snap", "full");
+  await expect(handle).toBeFocused();
+  expect(errors).toEqual([]);
+});
+
 test("the preview toggles between the stereogram and the depth map", async ({ page }) => {
   const { canvas, violations, errors } = await open(page);
   await expect(canvas).toHaveAttribute("data-output", "stereogram");
