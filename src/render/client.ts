@@ -44,31 +44,30 @@ function createRenderWorker(): Worker {
   return new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
 }
 
+/** Worker failures in a row, without a render in between, after which the client gives up. */
+const MAX_FAILURES = 3;
+
 /**
  * Renders recipes in one long-lived worker. The latest request wins: a newer call
  * rejects every unfinished one with `RenderAbortedError`. At most one request is with
  * the worker at a time and only the newest waiting call is sent after it, so a burst
- * of calls costs at most two renders.
+ * of calls costs at most two renders. A worker that fails is replaced on the next call,
+ * until it has failed `MAX_FAILURES` times in a row.
  */
 export class RenderClient {
-  readonly #worker: Worker;
+  readonly #createWorker: () => Worker;
+  #worker: Worker | undefined;
+  #failures = 0;
+  #lastError: Error | undefined;
+  #disposed = false;
   #nextId = 1;
   #inFlight: InFlight | undefined;
   #queued: Job | undefined;
   /** Assets the worker holds, by ID, as the objects that were sent. */
   readonly #sent = new Map<string, Asset>();
 
-  constructor(worker: Worker = createRenderWorker()) {
-    this.#worker = worker;
-    worker.addEventListener("message", (event: MessageEvent<RenderResponse>) => {
-      this.#receive(event.data);
-    });
-    worker.addEventListener("error", () => {
-      this.#fail(new Error("The render worker failed"));
-    });
-    worker.addEventListener("messageerror", () => {
-      this.#fail(new Error("The render worker sent an unreadable reply"));
-    });
+  constructor(createWorker: () => Worker = createRenderWorker) {
+    this.#createWorker = createWorker;
   }
 
   /** Calls whose promises haven't settled yet. */
@@ -78,6 +77,12 @@ export class RenderClient {
 
   render(recipe: Recipe, size: RenderSize, options: RenderOptions = {}): Promise<RenderImage> {
     this.#abortPending();
+    if (this.#disposed) {
+      return Promise.reject(new Error("The renderer has been stopped"));
+    }
+    if (this.#failures >= MAX_FAILURES) {
+      return Promise.reject(this.#lastError ?? new Error("The render worker failed"));
+    }
     return new Promise((resolve, reject) => {
       const job: Job = {
         recipe,
@@ -95,11 +100,42 @@ export class RenderClient {
     });
   }
 
-  /** Stops the worker and rejects unfinished calls. The client can't render afterwards. */
+  /** Stops the worker and rejects unfinished calls. Later calls reject at once. */
   dispose(): void {
     this.#abortPending();
+    this.#disposed = true;
+    this.#stopWorker();
+  }
+
+  #startWorker(): Worker {
+    if (this.#worker !== undefined) {
+      return this.#worker;
+    }
+    const worker = this.#createWorker();
+    worker.addEventListener("message", (event: MessageEvent<RenderResponse>) => {
+      if (worker === this.#worker) {
+        this.#receive(event.data);
+      }
+    });
+    worker.addEventListener("error", (event: Event) => {
+      const detail = event instanceof ErrorEvent && event.message !== "" ? event.message : "";
+      this.#fail(
+        worker,
+        new Error(`The render worker failed${detail === "" ? "" : `: ${detail}`}`),
+      );
+    });
+    worker.addEventListener("messageerror", () => {
+      this.#fail(worker, new Error("The render worker sent an unreadable reply"));
+    });
+    this.#worker = worker;
+    return worker;
+  }
+
+  #stopWorker(): void {
+    this.#worker?.terminate();
+    this.#worker = undefined;
     this.#inFlight = undefined;
-    this.#worker.terminate();
+    this.#sent.clear();
   }
 
   #abortPending(): void {
@@ -112,6 +148,7 @@ export class RenderClient {
   }
 
   #send(job: Job): void {
+    const worker = this.#startWorker();
     const assetIds = Object.keys(job.recipe.assets);
     const assets: Record<string, Asset> = {};
     for (const id of assetIds) {
@@ -139,7 +176,7 @@ export class RenderClient {
       assetIds,
     };
     this.#inFlight = { requestId, job };
-    this.#worker.postMessage(request, []);
+    worker.postMessage(request, []);
   }
 
   #receive(response: RenderResponse): void {
@@ -151,6 +188,7 @@ export class RenderClient {
       return;
     }
     this.#inFlight = undefined;
+    this.#failures = 0;
     const { job } = inFlight;
     if (response.ok) {
       if (job === undefined) {
@@ -168,11 +206,15 @@ export class RenderClient {
     }
   }
 
-  #fail(error: Error): void {
+  #fail(worker: Worker, error: Error): void {
+    if (worker !== this.#worker) {
+      return;
+    }
+    this.#failures++;
+    this.#lastError = error;
     this.#inFlight?.job?.reject(error);
     this.#queued?.reject(error);
-    this.#inFlight = undefined;
     this.#queued = undefined;
-    this.#sent.clear();
+    this.#stopWorker();
   }
 }

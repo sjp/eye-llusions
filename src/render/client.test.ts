@@ -29,9 +29,16 @@ class FakeWorker extends EventTarget {
   }
 }
 
-function setup(): { worker: FakeWorker; client: RenderClient } {
+/** `worker` is the first worker the client starts; `workers` lists those started so far. */
+function setup(): { worker: FakeWorker; workers: FakeWorker[]; client: RenderClient } {
   const worker = new FakeWorker();
-  return { worker, client: new RenderClient(worker as unknown as Worker) };
+  const workers: FakeWorker[] = [];
+  const client = new RenderClient(() => {
+    const created = workers.length === 0 ? worker : new FakeWorker();
+    workers.push(created);
+    return created as unknown as Worker;
+  });
+  return { worker, workers, client };
 }
 
 const SIZE = { width: 32, height: 18 };
@@ -123,15 +130,93 @@ describe("RenderClient", () => {
     expect(second.assetIds).toEqual(["a", "b"]);
   });
 
+  test("starts the worker on the first render", () => {
+    const { workers, client } = setup();
+    expect(workers).toHaveLength(0);
+    void client.render(defaultRecipe(), SIZE);
+    expect(workers).toHaveLength(1);
+  });
+
   test("a worker error rejects pending renders and resends assets afterwards", async () => {
-    const { worker, client } = setup();
+    const { worker, workers, client } = setup();
     const a = asset(1);
     const first = client.render(withAssets({ a }), SIZE);
-    worker.requests.length = 0;
     worker.dispatchEvent(new Event("error"));
     await expect(first).rejects.toThrow("render worker failed");
     void client.render(withAssets({ a }), SIZE);
-    expect(Object.keys(worker.requests[0].assets)).toEqual(["a"]);
+    expect(Object.keys(workers[1].requests[0].assets)).toEqual(["a"]);
+  });
+
+  test("after a worker error the next render succeeds on a fresh worker", async () => {
+    const { workers, client } = setup();
+    const first = client.render(defaultRecipe(), SIZE);
+    const broken = workers[0];
+    broken.dispatchEvent(new ErrorEvent("error", { message: "out of memory" }));
+    await expect(first).rejects.toThrow("The render worker failed: out of memory");
+    expect(broken.terminate).toHaveBeenCalledOnce();
+
+    const second = client.render(defaultRecipe(), SIZE);
+    expect(workers).toHaveLength(2);
+    expect(broken.requests).toHaveLength(1);
+    workers[1].reply();
+    expect(await second).toBe(workers[1].images[0]);
+  });
+
+  test("a queued render fails with the worker and the next one restarts it", async () => {
+    const { workers, client } = setup();
+    const first = client.render(defaultRecipe(), SIZE);
+    const queued = client.render(defaultRecipe(), SIZE);
+    workers[0].dispatchEvent(new Event("error"));
+    await expect(first).rejects.toSatisfy(isRenderAborted);
+    await expect(queued).rejects.toThrow("render worker failed");
+    const third = client.render(defaultRecipe(), SIZE);
+    workers[1].reply();
+    await expect(third).resolves.toBeDefined();
+  });
+
+  test("ignores events from a worker it has replaced", async () => {
+    const { workers, client } = setup();
+    void client.render(defaultRecipe(), SIZE).catch(() => undefined);
+    const old = workers[0];
+    old.dispatchEvent(new Event("error"));
+    const next = client.render(defaultRecipe(), SIZE);
+    old.dispatchEvent(new Event("error"));
+    old.send({ requestId: workers[1].requests[0].requestId, ok: false, message: "stale" });
+    expect(client.pending).toBe(1);
+    workers[1].reply();
+    await expect(next).resolves.toBeDefined();
+  });
+
+  test("gives up after three failures in a row and rejects at once", async () => {
+    const { workers, client } = setup();
+    for (let i = 0; i < 3; i++) {
+      const result = client.render(defaultRecipe(), SIZE);
+      workers[i].dispatchEvent(new ErrorEvent("error", { message: "404" }));
+      await expect(result).rejects.toThrow("404");
+    }
+    await expect(client.render(defaultRecipe(), SIZE)).rejects.toThrow("404");
+    expect(workers).toHaveLength(3);
+  });
+
+  test("a successful render resets the failure count", async () => {
+    const { workers, client } = setup();
+    const outcomes: Promise<unknown>[] = [];
+    for (let i = 0; i < 3; i++) {
+      const failing = client.render(defaultRecipe(), SIZE);
+      workers[i].dispatchEvent(new Event("error"));
+      outcomes.push(failing.catch(() => "failed"));
+      const working = client.render(defaultRecipe(), SIZE);
+      workers[i + 1].reply();
+      outcomes.push(working.then(() => "rendered"));
+    }
+    expect(await Promise.all(outcomes)).toEqual([
+      "failed",
+      "rendered",
+      "failed",
+      "rendered",
+      "failed",
+      "rendered",
+    ]);
   });
 
   test("dispose aborts unfinished renders and terminates the worker", async () => {
@@ -143,11 +228,20 @@ describe("RenderClient", () => {
     expect(client.pending).toBe(0);
   });
 
+  test("render after dispose rejects without starting a worker", async () => {
+    const { workers, client } = setup();
+    client.dispose();
+    await expect(client.render(defaultRecipe(), SIZE)).rejects.toThrow("stopped");
+    expect(workers).toHaveLength(0);
+  });
+
   test("ignores replies to requests it didn't send", () => {
-    const { worker, client } = setup();
+    const { workers, client } = setup();
+    void client.render(defaultRecipe(), SIZE).catch(() => undefined);
+    const worker = workers[0];
     const image = { close: vi.fn<() => void>() };
     worker.send({ requestId: 99, ok: true, image: image as unknown as RenderImage });
     expect(image.close).toHaveBeenCalledOnce();
-    expect(client.pending).toBe(0);
+    expect(client.pending).toBe(1);
   });
 });
