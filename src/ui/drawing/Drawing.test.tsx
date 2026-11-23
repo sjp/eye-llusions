@@ -24,7 +24,7 @@ function drawing(editor: Editor): DrawingLayer {
 }
 
 function surface(): HTMLElement {
-  return screen.getByLabelText("Drawing surface");
+  return screen.getByRole("img", { name: "Drawing surface" });
 }
 
 type Pointer = { pointerId: number; pointerType: string; x: number; y: number };

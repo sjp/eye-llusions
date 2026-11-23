@@ -313,6 +313,7 @@ export function DrawingSurface({ editor, layerId, strokes, tools, view, shown }:
       class="drawing-surface"
       data-tool={tools.tool.value}
       data-strokes={strokes}
+      role="img"
       aria-label="Drawing surface"
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}

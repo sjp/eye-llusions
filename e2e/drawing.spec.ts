@@ -12,7 +12,7 @@ async function openDrawing(page: Page) {
   await settledPixels(canvas, count);
   count = await renders(canvas);
   await page.getByRole("button", { name: "Add drawing" }).click();
-  const surface = page.getByLabel("Drawing surface");
+  const surface = page.getByRole("img", { name: "Drawing surface" });
   await expect(surface).toHaveAttribute("data-strokes", "0");
   await expect(page.getByRole("radio", { name: "Depth" })).toBeChecked();
   await expect(page.getByRole("radio", { name: "Draw" })).toBeChecked();
