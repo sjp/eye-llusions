@@ -73,6 +73,16 @@ describe("App", () => {
     expect(editor.recipe.value.view.mode).toBe("wall");
   });
 
+  test("the depth of field slider shows the range for the viewing mode", () => {
+    const { editor } = setup();
+    drag(slider("Depth of field"), [0.8]);
+    expect(slider("Depth of field").max).toBe("0.9");
+    fireEvent.click(screen.getByRole("radio", { name: "Cross-eyed" }));
+    expect(slider("Depth of field").max).toBe("0.5");
+    expect(slider("Depth of field").getAttribute("aria-valuetext")).toBe("50%");
+    expect(editor.recipe.value.view.depthOfField).toBe(0.5);
+  });
+
   test("keyboard shortcuts undo and redo, except in text fields", () => {
     const { editor } = setup();
     editor.setView({ repeats: 12 });

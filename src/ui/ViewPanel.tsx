@@ -1,3 +1,4 @@
+import { DEPTH_OF_FIELD_RANGE } from "../core/recipe.ts";
 import type { Editor } from "../state/editor.ts";
 import { Panel } from "./Panel.tsx";
 import { Segmented } from "./Segmented.tsx";
@@ -10,6 +11,7 @@ const MODES = [
 
 export function ViewPanel({ editor }: { editor: Editor }) {
   const { view } = editor.recipe.value;
+  const depthRange = DEPTH_OF_FIELD_RANGE[view.mode];
   const endEdit = (): void => {
     editor.endEdit();
   };
@@ -29,8 +31,8 @@ export function ViewPanel({ editor }: { editor: Editor }) {
       />
       <Slider
         label="Depth of field"
-        min={0.05}
-        max={0.9}
+        min={depthRange.min}
+        max={depthRange.max}
         step={0.01}
         value={view.depthOfField}
         format={(value) => `${String(Math.round(value * 100))}%`}
