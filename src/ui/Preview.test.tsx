@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/preact";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { RenderImage } from "../render/client.ts";
 import type { RenderOutput } from "../render/protocol.ts";
+import { PREVIEW_OVERSAMPLE } from "../render/resolution.ts";
 import { Editor } from "../state/editor.ts";
 import { Preview, type Renderer } from "./Preview.tsx";
 
@@ -9,6 +10,7 @@ type Call = {
   repeats: number;
   width: number;
   output: RenderOutput | undefined;
+  oversample: number | undefined;
   resolve: (image: RenderImage) => void;
   reject: (error: Error) => void;
 };
@@ -40,6 +42,7 @@ function fakeRenderer() {
           repeats: recipe.view.repeats,
           width: size.width,
           output: options?.output,
+          oversample: options?.oversample,
           resolve,
           reject,
         });
@@ -101,6 +104,12 @@ describe("Preview", () => {
     expect(summary().slice(3)).toEqual([{ repeats: 11, width: 800, output: "stereogram" }]);
     await finish(calls[3]);
     expect(canvas().dataset).toMatchObject({ quality: "full", renders: "4" });
+    expect(calls.map((call) => call.oversample)).toEqual([
+      PREVIEW_OVERSAMPLE,
+      1,
+      1,
+      PREVIEW_OVERSAMPLE,
+    ]);
   });
 
   test("renders discrete changes in full at once", async () => {

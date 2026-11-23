@@ -4,7 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { Recipe } from "../core/recipe.ts";
 import { isRenderAborted, type RenderClient, type RenderImage } from "../render/client.ts";
 import type { RenderOutput } from "../render/protocol.ts";
-import { createPreviewScheduler, previewDisplaySize, previewSize } from "../render/resolution.ts";
+import {
+  createPreviewScheduler,
+  PREVIEW_OVERSAMPLE,
+  previewDisplaySize,
+  previewSize,
+} from "../render/resolution.ts";
 import type { Editor } from "../state/editor.ts";
 
 export type Renderer = Pick<RenderClient, "render">;
@@ -126,9 +131,16 @@ export function Preview({ editor, renderer, output, transform, onShown, children
       }
       const recipe = editor.recipe.peek();
       const size = previewSize(recipe.aspect, current, current.pixelRatio, quality);
+      const oversample = quality === "full" ? PREVIEW_OVERSAMPLE : 1;
       busy = true;
       void drain(
-        show(renderer.render(recipe, size, { output: wanted }), recipe, current, wanted, quality),
+        show(
+          renderer.render(recipe, size, { output: wanted, oversample }),
+          recipe,
+          current,
+          wanted,
+          quality,
+        ),
       );
     };
     const drain = async (job: Promise<void>): Promise<void> => {

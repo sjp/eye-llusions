@@ -146,8 +146,9 @@ test("the bottom sheet doesn't animate when motion is reduced", async ({ page })
 test("the preview toggles between the stereogram and the depth map", async ({ page }) => {
   const { canvas, violations, errors } = await open(page);
   await expect(canvas).toHaveAttribute("data-output", "stereogram");
-  // The default texture is two-tone random dots.
-  expect((await colours(canvas)).count).toBeLessThanOrEqual(2);
+  // The default texture is two-tone random dots, blended where a supersampled pixel
+  // straddles both.
+  expect((await colours(canvas)).count).toBeLessThanOrEqual(3);
 
   await page.getByRole("radio", { name: "Depth" }).click();
   await expect(canvas).toHaveAttribute("data-output", "depth");

@@ -4,6 +4,12 @@ export const PREVIEW_MAX_PIXELS = 4_000_000;
 /** Linear scale of a draft render relative to the full preview. */
 export const DRAFT_SCALE = 0.5;
 
+/**
+ * Horizontal supersampling of a full preview, for finer depth steps within the frame
+ * budget. Drafts aren't supersampled.
+ */
+export const PREVIEW_OVERSAMPLE = 2;
+
 /** Horizontal supersampling of an exported image. */
 export const EXPORT_OVERSAMPLE = 4;
 

@@ -3,6 +3,7 @@ import { CORE_RASTERISERS } from "../core/depth/composite.ts";
 import { createRandom } from "../core/random.ts";
 import { defaultRecipe, type Brush, type Recipe, type Stroke } from "../core/recipe.ts";
 import { createDepthCache, renderPixels } from "./pipeline.ts";
+import { PREVIEW_MAX_PIXELS, PREVIEW_OVERSAMPLE } from "./resolution.ts";
 
 const MODES: Brush["mode"][] = ["set", "raise", "lower", "smooth"];
 
@@ -77,4 +78,26 @@ test("a view-only change to a heavy drawing at 1170×1500 is at least 5× faster
     full / viewOnly,
     `full ${full.toFixed(1)} ms, view only ${viewOnly.toFixed(1)} ms`,
   ).toBeGreaterThanOrEqual(5);
+});
+
+test("a view-only change to a full preview at the pixel cap renders within a frame budget", async () => {
+  const recipe = defaultRecipe();
+  const height = Math.floor(Math.sqrt((PREVIEW_MAX_PIXELS * 9) / 16));
+  const width = Math.floor((height * 16) / 9);
+  const request = { width, height, oversample: PREVIEW_OVERSAMPLE, output: "stereogram" as const };
+  const out = new Uint8ClampedArray(width * height * 4);
+  const cache = createDepthCache();
+  const render = (index: number) =>
+    renderPixels(
+      { ...recipe, view: { ...recipe.view, repeats: 6 + index } },
+      request,
+      CORE_RASTERISERS,
+      out,
+      undefined,
+      cache.composite,
+    );
+
+  await render(0);
+  const time = await median(render);
+  expect(time, `median ${time.toFixed(1)} ms`).toBeLessThan(300);
 });
