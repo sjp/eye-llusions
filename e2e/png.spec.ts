@@ -96,3 +96,41 @@ test("a file dropped on the app is opened", async ({ page, isMobile }) => {
   expect(violations).toEqual([]);
   expect(errors).toEqual([]);
 });
+
+test("a project PNG dropped on a layer row is opened", async ({ page, context, isMobile }) => {
+  test.skip(isMobile, "Dragging files is a desktop gesture");
+  const { list, violations, errors } = await openLayers(page);
+  await page.getByRole("button", { name: "Add text" }).click();
+  await expect(layerNames(list)).toHaveText(["Text", "Sphere"]);
+  await toolbarAction(page, "Save");
+  const dialog = page.getByRole("dialog", { name: "Save PNG" });
+  await dialog.getByRole("radio", { name: "Custom" }).check();
+  const width = dialog.getByRole("spinbutton", { name: "Width" });
+  await width.fill("320");
+  await width.press("Tab");
+  const downloading = page.waitForEvent("download");
+  await dialog.getByRole("button", { name: "Download" }).click();
+  const bytes = readFileSync(await (await downloading).path());
+
+  const opened = await context.newPage();
+  const reopened = await openLayers(opened);
+  await expect(layerNames(reopened.list)).toHaveText(["Sphere"]);
+  await reopened.list
+    .locator(".layer-row")
+    .first()
+    .evaluate((row, base64: string) => {
+      const data = Uint8Array.from(atob(base64), (char) => char.codePointAt(0) ?? 0);
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([data], "scene.png", { type: "image/png" }));
+      for (const type of ["dragenter", "dragover", "drop"]) {
+        row.dispatchEvent(
+          new DragEvent(type, { dataTransfer: transfer, bubbles: true, cancelable: true }),
+        );
+      }
+    }, bytes.toString("base64"));
+  await expect(layerNames(reopened.list)).toHaveText(["Text", "Sphere"]);
+  for (const watched of [{ violations, errors }, reopened]) {
+    expect(watched.violations).toEqual([]);
+    expect(watched.errors).toEqual([]);
+  }
+});

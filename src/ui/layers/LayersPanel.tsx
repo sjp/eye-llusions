@@ -91,6 +91,8 @@ type RowProps = {
   count: number;
   selected: boolean;
   dropTarget: boolean;
+  /** Whether a layer row is being dragged, so drags of anything else pass through. */
+  reordering: boolean;
   onSelect: () => void;
   onVisible: (visible: boolean) => void;
   onMove: (to: number) => void;
@@ -123,12 +125,16 @@ function LayerRow(props: RowProps) {
         props.onDragStart();
       }}
       onDragOver={(event) => {
-        event.preventDefault();
-        props.onDragOver();
+        if (props.reordering) {
+          event.preventDefault();
+          props.onDragOver();
+        }
       }}
       onDrop={(event) => {
-        event.preventDefault();
-        props.onDrop();
+        if (props.reordering) {
+          event.preventDefault();
+          props.onDrop();
+        }
       }}
       onDragEnd={props.onDragEnd}
     >
@@ -309,6 +315,7 @@ export function LayersPanel({
                 count={layers.length}
                 selected={layer === selected}
                 dropTarget={over === layer.id && dragging !== layer.id}
+                reordering={dragging !== undefined}
                 onSelect={() => {
                   setSelectedId(layer.id);
                 }}
