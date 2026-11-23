@@ -53,11 +53,22 @@ function useSize(ref: { current: HTMLElement | null }): Size {
 }
 
 function PeekButton({ peeking, onPeek }: { peeking: boolean; onPeek: (on: boolean) => void }) {
-  const press = useRef<{ start: number; was: boolean } | undefined>(undefined);
+  const press = useRef<{ start: number; was: boolean; released: boolean } | undefined>(undefined);
   const release = (event: PointerEvent): void => {
     const current = press.current;
-    if (current !== undefined && (current.was || event.timeStamp - current.start >= HOLD_MS)) {
+    if (current === undefined || current.released) {
+      return;
+    }
+    current.released = true;
+    if (current.was || event.timeStamp - current.start >= HOLD_MS) {
       onPeek(false);
+    }
+  };
+  // Without a release, no click follows to end the press.
+  const abandon = (event: PointerEvent): void => {
+    if (press.current?.released === false) {
+      release(event);
+      press.current = undefined;
     }
   };
   return (
@@ -70,14 +81,17 @@ function PeekButton({ peeking, onPeek }: { peeking: boolean; onPeek: (on: boolea
         if (event.button !== 0) {
           return;
         }
-        press.current = { start: event.timeStamp, was: peeking };
+        try {
+          event.currentTarget.setPointerCapture(event.pointerId);
+        } catch {
+          // Capture is a nicety; synthetic pointers may not support it.
+        }
+        press.current = { start: event.timeStamp, was: peeking, released: false };
         onPeek(true);
       }}
       onPointerUp={release}
-      onPointerCancel={(event) => {
-        release(event);
-        press.current = undefined;
-      }}
+      onPointerCancel={abandon}
+      onLostPointerCapture={abandon}
       onContextMenu={(event) => {
         event.preventDefault();
       }}

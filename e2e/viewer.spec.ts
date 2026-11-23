@@ -125,3 +125,22 @@ test("a size preset changes the repeats as an undoable step", async ({ page }) =
     await expect(slider).toHaveValue("8");
   }
 });
+
+test("holding Peek and releasing off the button stops peeking", async ({ page, isMobile }) => {
+  test.skip(isMobile, "Uses a mouse");
+  const { viewer, canvas } = await openViewer(page);
+  const peek = viewer.getByRole("button", { name: "Peek" });
+  const button = await box(peek);
+  await page.mouse.move(button.x + button.width / 2, button.y + button.height / 2);
+  await page.mouse.down();
+  await expect(canvas).toHaveAttribute("data-output", "depth");
+  await page.waitForTimeout(400);
+  await page.mouse.move(button.x + button.width / 2, button.y + button.height * 4, { steps: 5 });
+  await page.mouse.up();
+  await expect(peek).toHaveAttribute("aria-pressed", "false");
+  await expect(canvas).toHaveAttribute("data-output", "stereogram");
+
+  await peek.focus();
+  await page.keyboard.press("Enter");
+  await expect(peek).toHaveAttribute("aria-pressed", "true");
+});
