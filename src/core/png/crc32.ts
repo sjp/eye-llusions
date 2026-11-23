@@ -13,8 +13,9 @@ const TABLE = (() => {
 /** The CRC-32 used by PNG, zlib and gzip, continuing from `crc` over `bytes`. */
 export function crc32(bytes: Uint8Array, crc = 0): number {
   let c = ~crc >>> 0;
-  for (const byte of bytes) {
-    c = TABLE[(c ^ byte) & 0xff] ^ (c >>> 8);
+  // oxlint-disable-next-line typescript/prefer-for-of -- an indexed loop is several times faster
+  for (let i = 0; i < bytes.length; i++) {
+    c = TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
   }
   return ~c >>> 0;
 }
