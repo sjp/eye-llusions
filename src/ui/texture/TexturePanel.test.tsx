@@ -1,9 +1,15 @@
 import { fireEvent, render, screen } from "@testing-library/preact";
-import { expect, test } from "vitest";
+import { expect, onTestFinished, test, vi } from "vitest";
 import { defaultRecipe } from "../../core/recipe.ts";
 import { scaleLimits } from "../../core/texture/scale.ts";
 import { Editor } from "../../state/editor.ts";
+import { textureSwatch } from "./swatches.ts";
 import { TexturePanel } from "./TexturePanel.tsx";
+
+vi.mock(import("./swatches.ts"), async (original) => {
+  const actual = await original();
+  return { ...actual, textureSwatch: vi.fn<typeof actual.textureSwatch>(actual.textureSwatch) };
+});
 
 function setup() {
   const editor = new Editor(defaultRecipe(), () => 99);
@@ -147,4 +153,24 @@ test("warns about colours too similar in brightness, without blocking them", () 
     type: "custom",
     stops: ["#ff0000", "#7f7f7f"],
   });
+});
+
+test("pattern swatches wait for a drag to end before redrawing", () => {
+  const putImageData = vi.fn<CanvasRenderingContext2D["putImageData"]>();
+  onTestFinished(() => {
+    vi.restoreAllMocks();
+  });
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+    putImageData,
+  } as unknown as CanvasRenderingContext2D);
+  setup();
+  const draws = vi.mocked(textureSwatch);
+  const before = draws.mock.calls.length;
+  const slider = screen.getByRole("slider", { name: "Scale" });
+  for (const value of ["0.5", "0.6", "0.7"]) {
+    fireEvent.input(slider, { target: { value } });
+  }
+  expect(draws.mock.calls.length).toBe(before);
+  fireEvent.change(slider);
+  expect(draws.mock.calls.length).toBe(before + 6);
 });

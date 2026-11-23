@@ -26,31 +26,47 @@ const SWATCH_HEIGHT = 48;
 const STRIP_WIDTH = 64;
 const STRIP_HEIGHT = 12;
 
+function sameDeps(a: readonly unknown[], b: readonly unknown[]): boolean {
+  return a.length === b.length && a.every((value, index) => Object.is(value, b[index]));
+}
+
+/**
+ * A canvas drawn whenever `deps` change. While `paused`, such as during a slider drag,
+ * it keeps its last drawing and catches up once unpaused.
+ */
 function SwatchCanvas({
   draw,
   width,
   height,
   class: className,
   deps,
+  paused,
 }: {
   draw: () => ImageData;
   width: number;
   height: number;
   class: string;
   deps: readonly unknown[];
+  paused: boolean;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const drawn = useRef<readonly unknown[] | undefined>(undefined);
   useEffect(() => {
+    if (drawn.current !== undefined && (paused || sameDeps(drawn.current, deps))) {
+      return;
+    }
+    drawn.current = deps;
     const context = ref.current?.getContext("2d");
     context?.putImageData(draw(), 0, 0);
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- `draw` is new on every render
-  }, deps);
+  }, [...deps, paused]);
   return <canvas ref={ref} class={className} width={width} height={height} aria-hidden="true" />;
 }
 
 function GeneratorPicker({ recipe, editor }: { recipe: Recipe; editor: Editor }) {
   const name = useId();
   const { texture, seed, aspect, view } = recipe;
+  const editing = editor.editing.value;
   return (
     <fieldset class="choice-picker">
       <legend>Pattern</legend>
@@ -75,6 +91,7 @@ function GeneratorPicker({ recipe, editor }: { recipe: Recipe; editor: Editor })
                 }}
               />
               <SwatchCanvas
+                paused={editing}
                 class="texture-swatch"
                 width={SWATCH_WIDTH}
                 height={SWATCH_HEIGHT}
@@ -110,6 +127,7 @@ const PRESET_LABELS: Readonly<Record<string, string>> = {
 
 function PalettePicker({ palette, editor }: { palette: Palette; editor: Editor }) {
   const name = useId();
+  const editing = editor.editing.value;
   const custom: Palette & { type: "custom" } = {
     type: "custom",
     stops: [...paletteStops(palette)],
@@ -132,6 +150,7 @@ function PalettePicker({ palette, editor }: { palette: Palette; editor: Editor }
                 }}
               />
               <SwatchCanvas
+                paused={editing}
                 class="palette-swatch"
                 width={STRIP_WIDTH}
                 height={STRIP_HEIGHT}
@@ -154,6 +173,7 @@ function PalettePicker({ palette, editor }: { palette: Palette; editor: Editor }
             }}
           />
           <SwatchCanvas
+            paused={editing}
             class="palette-swatch"
             width={STRIP_WIDTH}
             height={STRIP_HEIGHT}
