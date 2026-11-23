@@ -29,6 +29,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - name: Check generated figures are up to date
+        run: |
+          npm run figures
+          git diff --exit-code src/assets/figures
+          test -z "$(git status --porcelain src/assets/figures)"
       - run: npm test
       - run: npm run build
       - run: npx playwright install --with-deps chromium webkit
