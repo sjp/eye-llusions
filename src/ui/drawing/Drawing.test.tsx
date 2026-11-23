@@ -190,6 +190,17 @@ describe("drawing on the preview", () => {
     expect(drawing(editor).strokes).toHaveLength(2);
   });
 
+  test("leaving the drawing layer restores the preview's earlier output", () => {
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: "Sphere" }));
+    expect(screen.getByRole<HTMLInputElement>("radio", { name: "Stereogram" }).checked).toBe(true);
+
+    fireEvent.click(screen.getByRole("radio", { name: "Depth" }));
+    fireEvent.click(screen.getByRole("button", { name: "Drawing" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sphere" }));
+    expect(screen.getByRole<HTMLInputElement>("radio", { name: "Depth" }).checked).toBe(true);
+  });
+
   test("the drawing surface goes away when another layer is selected", () => {
     setup();
     fireEvent.click(screen.getByRole("button", { name: "Sphere" }));

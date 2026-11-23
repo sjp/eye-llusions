@@ -1,5 +1,5 @@
 import { useSignal, type ReadonlySignal } from "@preact/signals";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import type { Recipe } from "../core/recipe.ts";
 import type { RenderOutput } from "../render/protocol.ts";
 import type { Editor } from "../state/editor.ts";
@@ -29,7 +29,7 @@ type Props = {
 
 /**
  * The preview with its output toggle. While a drawing layer is selected, the preview
- * takes strokes, zooms and pans, and switches to the depth view.
+ * takes strokes, zooms and pans, and switches to the depth view until it is left.
  */
 export function Stage({ editor, renderer, selection, tools }: Props) {
   const [output, setOutput] = useState<RenderOutput>("stereogram");
@@ -39,10 +39,20 @@ export function Stage({ editor, renderer, selection, tools }: Props) {
   const drawingLayer = layer?.kind === "drawing" ? layer : undefined;
   const drawingId = drawingLayer?.id;
 
+  const shownOutput = useRef(output);
+  shownOutput.current = output;
+  /** The output from before a drawing layer was selected. */
+  const outputBefore = useRef<RenderOutput | undefined>(undefined);
+
   useEffect(() => {
     if (drawingId === undefined) {
       view.value = IDENTITY;
+      if (outputBefore.current !== undefined) {
+        setOutput(outputBefore.current);
+        outputBefore.current = undefined;
+      }
     } else {
+      outputBefore.current ??= shownOutput.current;
       setOutput("depth");
     }
   }, [drawingId, view]);
