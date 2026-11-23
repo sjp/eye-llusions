@@ -3,7 +3,8 @@ import type { Asset } from "../core/recipe.ts";
 import type { RasteriserRegistry } from "../core/depth/raster.ts";
 import { createSampleRasteriser } from "./figures.ts";
 import { renderPixels, restoreAssets } from "./pipeline.ts";
-import type { RenderRequest, RenderResponse } from "./protocol.ts";
+import type { RenderRequest } from "./protocol.ts";
+import { createRenderQueue } from "./queue.ts";
 import { createTextRasteriser } from "./text.ts";
 
 const rasterisers: RasteriserRegistry = {
@@ -38,25 +39,18 @@ async function toImage(
   return data;
 }
 
-async function handle(request: RenderRequest): Promise<void> {
-  let response: RenderResponse;
-  let transfer: Transferable[] = [];
-  try {
+const enqueue = createRenderQueue(
+  async (request) => {
     const recipe = restoreAssets(assets, request);
     const pixels = await renderPixels(recipe, request, rasterisers, buffer);
     const image = await toImage(pixels, request.width, request.height);
-    response = { requestId: request.requestId, ok: true, image };
-    transfer = [image instanceof ImageData ? image.data.buffer : image];
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    response = { requestId: request.requestId, ok: false, message };
-  }
-  postMessage(response, { transfer });
-}
-
-let queue = Promise.resolve();
+    return { image, transfer: [image instanceof ImageData ? image.data.buffer : image] };
+  },
+  (response, transfer) => {
+    postMessage(response, { transfer });
+  },
+);
 
 addEventListener("message", (event: MessageEvent<RenderRequest>) => {
-  const request = event.data;
-  queue = queue.then(() => handle(request));
+  void enqueue(event.data);
 });
