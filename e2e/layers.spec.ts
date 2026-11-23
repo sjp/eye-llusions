@@ -1,8 +1,8 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./guard.ts";
 import { layerNames as names, openLayers as open, renders, settledPixels } from "./preview.ts";
 
 test("adding, hiding and deleting a shape changes the depth map and back", async ({ page }) => {
-  const { canvas, list, violations, errors } = await open(page);
+  const { canvas, list } = await open(page);
   let count = await renders(canvas);
   await page.getByRole("radio", { name: "Depth" }).click();
   const original = await settledPixels(canvas, count);
@@ -50,12 +50,10 @@ test("adding, hiding and deleting a shape changes the depth map and back", async
   await page.getByRole("radio", { name: "Stereogram" }).click();
   await settledPixels(canvas, count);
   await expect(canvas).toHaveAttribute("data-output", "stereogram");
-  expect(violations).toEqual([]);
-  expect(errors).toEqual([]);
 });
 
 test("the move buttons reorder layers and undo", async ({ page }) => {
-  const { list, errors } = await open(page);
+  const { list } = await open(page);
   await page.getByRole("button", { name: "Add shape" }).click();
   await page.getByRole("button", { name: "Add shape" }).click();
   await expect(names(list)).toHaveText(["Sphere 3", "Sphere 2", "Sphere"]);
@@ -70,12 +68,11 @@ test("the move buttons reorder layers and undo", async ({ page }) => {
 
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(names(list)).toHaveText(["Sphere 2", "Sphere", "Sphere 3"]);
-  expect(errors).toEqual([]);
 });
 
 test("layers reorder by dragging on desktop", async ({ page, isMobile }) => {
   test.skip(isMobile, "Phones reorder with the move buttons");
-  const { list, errors } = await open(page);
+  const { list } = await open(page);
   await page.getByRole("button", { name: "Add shape" }).click();
   await page.getByRole("button", { name: "Add shape" }).click();
   await expect(names(list)).toHaveText(["Sphere 3", "Sphere 2", "Sphere"]);
@@ -88,5 +85,4 @@ test("layers reorder by dragging on desktop", async ({ page, isMobile }) => {
 
   await page.keyboard.press("ControlOrMeta+z");
   await expect(names(list)).toHaveText(["Sphere 2", "Sphere", "Sphere 3"]);
-  expect(errors).toEqual([]);
 });

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
-import { expect, test, type Locator, type Page } from "@playwright/test";
-import { watchPage } from "./guard.ts";
+import type { Locator, Page } from "@playwright/test";
+import { expect, test } from "./guard.ts";
 import { layerNames, openLayers, settledPixels, toolbarAction } from "./preview.ts";
 
 /** The share of pixels brighter than black, and the number of distinct colours. */
@@ -22,10 +22,8 @@ function inked(canvas: Locator) {
 }
 
 async function openGallery(page: Page) {
-  const watched = await watchPage(page);
   await page.goto("./");
   await expect(page.getByRole("button", { name: "Start from blank" })).toBeVisible();
-  return watched;
 }
 
 /** Remixes a sample and shows the controls, as `openLayers` does for a blank scene. */
@@ -41,7 +39,7 @@ async function remix(page: Page, title: string) {
 }
 
 test("the gallery is the first screen and draws every thumbnail", async ({ page }) => {
-  const { violations, errors } = await openGallery(page);
+  await openGallery(page);
   const thumbnails = page.getByRole("img", { name: /stereogram$/ });
   const count = await thumbnails.count();
   expect(count).toBeGreaterThanOrEqual(8);
@@ -51,15 +49,13 @@ test("the gallery is the first screen and draws every thumbnail", async ({ page 
     await expect(thumbnail).toHaveAttribute("data-ready", "true");
     await expect.poll(async () => (await inked(thumbnail)).colours).toBeGreaterThan(1);
   }
-  expect(violations).toEqual([]);
-  expect(errors).toEqual([]);
 });
 
 test("a remixed and edited sample survives a share link, figure included", async ({
   page,
   context,
 }) => {
-  const { violations, errors } = await openGallery(page);
+  await openGallery(page);
   const { canvas, list } = await remix(page, "Heart");
   await expect(layerNames(list)).toHaveText(["Heart"]);
   await expect(page.getByRole("button", { name: "Undo" })).toBeDisabled();
@@ -83,15 +79,10 @@ test("a remixed and edited sample survives a share link, figure included", async
   await opened.getByRole("radio", { name: "Depth" }).check();
   await expect(opened.getByRole("radio", { name: "Star", exact: true })).toBeChecked();
   expect(await settledPixels(shared.canvas, 0)).toBe(star);
-
-  for (const watched of [{ violations, errors }, shared]) {
-    expect(watched.violations).toEqual([]);
-    expect(watched.errors).toEqual([]);
-  }
 });
 
 test("going back to the gallery asks before dropping changes", async ({ page }) => {
-  const { violations, errors } = await openGallery(page);
+  await openGallery(page);
   await remix(page, "Hello");
   await page.getByRole("button", { name: "Gallery" }).click();
   await expect(page.getByRole("button", { name: "Start from blank" })).toBeVisible();
@@ -107,14 +98,12 @@ test("going back to the gallery asks before dropping changes", async ({ page }) 
   await page.getByRole("button", { name: "Gallery" }).click();
   await dialog.getByRole("button", { name: "Go to gallery" }).click();
   await expect(page.getByRole("button", { name: "Start from blank" })).toBeVisible();
-  expect(violations).toEqual([]);
-  expect(errors).toEqual([]);
 });
 
 test("Back from Create returns to the gallery, asking first when the scene changed", async ({
   page,
 }) => {
-  const { violations, errors } = await openGallery(page);
+  await openGallery(page);
   const blank = page.getByRole("button", { name: "Start from blank" });
   await remix(page, "Hello");
   await page.goBack();
@@ -138,25 +127,21 @@ test("Back from Create returns to the gallery, asking first when the scene chang
   await page.goBack();
   await dialog.getByRole("button", { name: "Go to gallery" }).click();
   await expect(blank).toBeVisible();
-  expect(violations).toEqual([]);
-  expect(errors).toEqual([]);
 });
 
 test("viewing a sample opens the viewer and leads back to the gallery", async ({ page }) => {
-  const { violations, errors } = await openGallery(page);
+  await openGallery(page);
   await page.getByRole("button", { name: "View Cat nap" }).click();
   const viewer = page.getByRole("dialog", { name: "Viewer" });
   await expect(viewer).toBeVisible();
   await expect(viewer.locator(".preview-canvas")).toHaveAttribute("data-quality", "full");
   await viewer.getByRole("button", { name: "Exit" }).click();
   await expect(page.getByRole("button", { name: "Start from blank" })).toBeVisible();
-  expect(violations).toEqual([]);
-  expect(errors).toEqual([]);
 });
 
 test("a file dropped on the gallery opens in Create", async ({ page, isMobile }) => {
   test.skip(isMobile, "Dragging files is a desktop gesture");
-  const { violations, errors } = await openGallery(page);
+  await openGallery(page);
   await page.locator(".gallery").evaluate(
     (gallery, base64: string) => {
       const data = Uint8Array.from(atob(base64), (char) => char.codePointAt(0) ?? 0);
@@ -172,6 +157,4 @@ test("a file dropped on the gallery opens in Create", async ({ page, isMobile })
   );
   await expect(page.getByRole("alert")).toContainText("doesn't contain an Eye-llusion project");
   await expect(page.getByRole("button", { name: "View" })).toBeVisible();
-  expect(violations).toEqual([]);
-  expect(errors).toEqual([]);
 });

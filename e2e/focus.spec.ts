@@ -1,5 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-import { watchPage } from "./guard.ts";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./guard.ts";
 import { openCreate, openLayers, toolbarAction } from "./preview.ts";
 
 /** Fails if focus has fallen back to the page itself. */
@@ -10,7 +10,6 @@ async function expectFocusKept(page: Page) {
 test("the viewer's instructions close to their button, and Escape closes them first", async ({
   page,
 }) => {
-  const { errors } = await watchPage(page);
   await openCreate(page);
   await page.getByRole("button", { name: "View" }).click();
   const viewer = page.getByRole("dialog", { name: "Viewer" });
@@ -31,7 +30,6 @@ test("the viewer's instructions close to their button, and Escape closes them fi
   await page.keyboard.press("Escape");
   await expect(viewer).toBeHidden();
   await expect(page.getByRole("button", { name: "View" })).toBeFocused();
-  expect(errors).toEqual([]);
 });
 
 test("leaving a viewer opened from the gallery focuses the sample's View button", async ({

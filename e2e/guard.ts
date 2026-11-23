@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { expect, test as base, type BrowserContext } from "@playwright/test";
 
 declare global {
   interface Window {
@@ -6,25 +6,51 @@ declare global {
   }
 }
 
-/** Collects console errors, page errors and CSP violations from now on. */
-export async function watchPage(page: Page): Promise<{ violations: string[]; errors: string[] }> {
-  const errors: string[] = [];
-  page.on("console", (message) => {
+export interface Watched {
+  violations: string[];
+  errors: string[];
+}
+
+/** Collects console errors, page errors and CSP violations from every page in the context. */
+export async function watchContext(context: BrowserContext): Promise<Watched> {
+  const watched: Watched = { violations: [], errors: [] };
+  context.on("console", (message) => {
     if (message.type() === "error") {
-      errors.push(message.text());
+      watched.errors.push(message.text());
     }
   });
-  page.on("pageerror", (error) => {
-    errors.push(error.message);
+  context.on("weberror", (error) => {
+    watched.errors.push(error.error().message);
   });
-  const violations: string[] = [];
-  await page.exposeFunction("reportCspViolation", (description: string) => {
-    violations.push(description);
+  await context.exposeBinding("reportCspViolation", (_source, description: string) => {
+    watched.violations.push(description);
   });
-  await page.addInitScript(() => {
+  await context.addInitScript(() => {
     document.addEventListener("securitypolicyviolation", (event) => {
       void window.reportCspViolation(`${event.effectiveDirective} blocked ${event.blockedURI}`);
     });
   });
-  return { violations, errors };
+  return watched;
 }
+
+/**
+ * Playwright's `test`, failing any test whose pages log a console error, throw, or break
+ * the CSP, even when the test fails first. `test.use({ consoleErrors: "allow" })` lets
+ * console errors through for tests that expect them.
+ */
+export const test = base.extend<{ consoleErrors: "fail" | "allow"; guard: Watched }>({
+  consoleErrors: ["fail", { option: true }],
+  guard: [
+    async ({ context, consoleErrors }, use) => {
+      const watched = await watchContext(context);
+      await use(watched);
+      expect(watched.violations, "CSP violations").toEqual([]);
+      if (consoleErrors === "fail") {
+        expect(watched.errors, "console and page errors").toEqual([]);
+      }
+    },
+    { auto: true },
+  ],
+});
+
+export { expect };

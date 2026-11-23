@@ -1,5 +1,5 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
-import { watchPage } from "./guard.ts";
+import type { Locator, Page } from "@playwright/test";
+import { expect, test } from "./guard.ts";
 import { openCreate } from "./preview.ts";
 
 declare global {
@@ -13,7 +13,6 @@ async function open(page: Page, viewport?: { width: number; height: number }) {
   if (viewport !== undefined) {
     await page.setViewportSize(viewport);
   }
-  const watched = await watchPage(page);
   await page.addInitScript(() => {
     window.previewLog = [];
     new MutationObserver((records) => {
@@ -28,7 +27,7 @@ async function open(page: Page, viewport?: { width: number; height: number }) {
   await openCreate(page);
   const canvas = page.locator(".preview-canvas");
   await expect(canvas).toHaveAttribute("data-quality", "full");
-  return { ...watched, canvas };
+  return { canvas };
 }
 
 async function box(locator: Locator) {
@@ -56,7 +55,7 @@ function colours(canvas: Locator) {
 }
 
 test("wide screens show the controls beside the preview", async ({ page }) => {
-  const { canvas, violations, errors } = await open(page, { width: 1280, height: 800 });
+  const { canvas } = await open(page, { width: 1280, height: 800 });
   const sheet = page.getByRole("complementary", { name: "Controls" });
   const preview = await box(page.locator(".preview"));
   const panel = await box(sheet);
@@ -66,12 +65,10 @@ test("wide screens show the controls beside the preview", async ({ page }) => {
   await expect(page.getByRole("slider", { name: "Repeats" })).toBeVisible();
   const shown = await box(canvas);
   expect(shown.width).toBeGreaterThan(700);
-  expect(violations).toEqual([]);
-  expect(errors).toEqual([]);
 });
 
 test("narrow screens show a bottom sheet that drags open", async ({ page }) => {
-  const { canvas, violations, errors } = await open(page, { width: 390, height: 844 });
+  const { canvas } = await open(page, { width: 390, height: 844 });
   const sheet = page.getByRole("complementary", { name: "Controls" });
   const handle = page.getByRole("button", { name: "Controls" });
   await expect(handle).toBeVisible();
@@ -107,12 +104,10 @@ test("narrow screens show a bottom sheet that drags open", async ({ page }) => {
 
   await handle.click();
   await expect(sheet).toHaveAttribute("data-snap", "peek");
-  expect(violations).toEqual([]);
-  expect(errors).toEqual([]);
 });
 
 test("the keyboard moves the bottom sheet through every height", async ({ page }) => {
-  const { errors } = await open(page, { width: 390, height: 844 });
+  await open(page, { width: 390, height: 844 });
   const sheet = page.getByRole("complementary", { name: "Controls" });
   const handle = page.getByRole("button", { name: "Controls" });
   await handle.focus();
@@ -131,7 +126,6 @@ test("the keyboard moves the bottom sheet through every height", async ({ page }
   await page.keyboard.press("Enter");
   await expect(sheet).toHaveAttribute("data-snap", "full");
   await expect(handle).toBeFocused();
-  expect(errors).toEqual([]);
 });
 
 test("the bottom sheet doesn't animate when motion is reduced", async ({ page }) => {
@@ -144,7 +138,7 @@ test("the bottom sheet doesn't animate when motion is reduced", async ({ page })
 });
 
 test("the preview toggles between the stereogram and the depth map", async ({ page }) => {
-  const { canvas, violations, errors } = await open(page);
+  const { canvas } = await open(page);
   await expect(canvas).toHaveAttribute("data-output", "stereogram");
   // The default texture is two-tone random dots, blended where a supersampled pixel
   // straddles both.
@@ -160,15 +154,13 @@ test("the preview toggles between the stereogram and the depth map", async ({ pa
 
   await page.getByRole("radio", { name: "Stereogram" }).click();
   await expect(canvas).toHaveAttribute("data-output", "stereogram");
-  expect(violations).toEqual([]);
-  expect(errors).toEqual([]);
 });
 
 test("dragging a view slider previews drafts and undoes as one step", async ({
   page,
   isMobile,
 }) => {
-  const { violations, errors } = await open(page);
+  await open(page);
   const handle = page.getByRole("button", { name: "Controls" });
   if (await handle.isVisible()) {
     await handle.click();
@@ -218,8 +210,6 @@ test("dragging a view slider previews drafts and undoes as one step", async ({
   await expect(undo).toBeDisabled();
   await page.getByRole("button", { name: "Redo" }).click();
   await expect(slider).toHaveValue(String(dragged));
-  expect(violations).toEqual([]);
-  expect(errors).toEqual([]);
 });
 
 test("keyboard shortcuts undo and redo a slider step", async ({ page, isMobile }) => {

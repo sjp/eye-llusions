@@ -1,4 +1,5 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
+import { expect, test } from "./guard.ts";
 import { openLayers, renders, settledPixels } from "./preview.ts";
 
 type Step = { type: "down" | "move" | "up"; id: number; x: number; y: number };
@@ -52,7 +53,7 @@ async function touch(surface: Locator, steps: Step[]): Promise<void> {
 }
 
 test("a mouse stroke adds a stroke that undo removes", async ({ page }) => {
-  const { canvas, surface, before, violations, errors } = await openDrawing(page);
+  const { canvas, surface, before } = await openDrawing(page);
   const points = await at(surface, [
     [0.2, 0.3],
     [0.4, 0.5],
@@ -74,13 +75,10 @@ test("a mouse stroke adds a stroke that undo removes", async ({ page }) => {
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(surface).toHaveAttribute("data-strokes", "0");
   expect(await settledPixels(canvas, count)).toBe(before);
-
-  expect(violations).toEqual([]);
-  expect(errors).toEqual([]);
 });
 
 test("a touch stroke adds a stroke", async ({ page }) => {
-  const { canvas, surface, before, violations, errors } = await openDrawing(page);
+  const { canvas, surface, before } = await openDrawing(page);
   const points = await at(surface, [
     [0.3, 0.3],
     [0.5, 0.5],
@@ -94,12 +92,10 @@ test("a touch stroke adds a stroke", async ({ page }) => {
   ]);
   await expect(surface).toHaveAttribute("data-strokes", "1");
   expect(await settledPixels(canvas, count)).not.toBe(before);
-  expect(violations).toEqual([]);
-  expect(errors).toEqual([]);
 });
 
 test("a two-finger gesture zooms without adding a stroke", async ({ page }) => {
-  const { surface, violations, errors } = await openDrawing(page);
+  const { surface } = await openDrawing(page);
   const original = await surface.boundingBox();
   const [a0, b0, a1, b1] = await at(surface, [
     [0.45, 0.5],
@@ -127,8 +123,6 @@ test("a two-finger gesture zooms without adding a stroke", async ({ page }) => {
 
   await reset.click();
   await expect(reset).toBeHidden();
-  expect(violations).toEqual([]);
-  expect(errors).toEqual([]);
 });
 
 test("real touches draw with one finger and zoom with two", async ({
@@ -137,7 +131,7 @@ test("real touches draw with one finger and zoom with two", async ({
   isMobile,
 }) => {
   test.skip(browserName !== "chromium" || !isMobile, "Needs Chromium's touch emulation");
-  const { surface, violations, errors } = await openDrawing(page);
+  const { surface } = await openDrawing(page);
   const cdp = await page.context().newCDPSession(page);
   const send = async (
     type: "touchStart" | "touchMove" | "touchEnd",
@@ -172,6 +166,4 @@ test("real touches draw with one finger and zoom with two", async ({
   await send("touchEnd", []);
   await expect(page.getByRole("button", { name: "Reset zoom" })).toBeVisible();
   await expect(surface).toHaveAttribute("data-strokes", "1");
-  expect(violations).toEqual([]);
-  expect(errors).toEqual([]);
 });

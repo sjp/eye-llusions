@@ -1,9 +1,8 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
-import { watchPage } from "./guard.ts";
+import type { Locator, Page } from "@playwright/test";
+import { expect, test } from "./guard.ts";
 import { openCreate } from "./preview.ts";
 
 async function openViewer(page: Page) {
-  const watched = await watchPage(page);
   await openCreate(page);
   await expect(page.locator(".preview-canvas")).toHaveAttribute("data-quality", "full");
   await page.getByRole("button", { name: "View" }).click();
@@ -11,7 +10,7 @@ async function openViewer(page: Page) {
   await expect(viewer).toBeVisible();
   const canvas = viewer.locator(".preview-canvas");
   await expect(canvas).toHaveAttribute("data-quality", "full");
-  return { ...watched, viewer, canvas };
+  return { viewer, canvas };
 }
 
 async function box(locator: Locator) {
@@ -28,7 +27,7 @@ async function expectCreate(page: Page) {
 }
 
 test("the viewer fills the screen and the Exit button leaves it", async ({ page }) => {
-  const { viewer, canvas, violations, errors } = await openViewer(page);
+  const { viewer, canvas } = await openViewer(page);
   const size = page.viewportSize() ?? { width: 0, height: 0 };
   const shown = await box(viewer);
   expect(shown.width).toBeCloseTo(size.width, 0);
@@ -50,22 +49,19 @@ test("the viewer fills the screen and the Exit button leaves it", async ({ page 
   await expect(viewer).toBeVisible();
   // The instructions stay dismissed until asked for.
   await expect(page.getByRole("region", { name: "How to view" })).toBeHidden();
-  expect(violations).toEqual([]);
-  expect(errors).toEqual([]);
 });
 
 test("Escape closes the instructions, then leaves the viewer", async ({ page }) => {
-  const { viewer, errors } = await openViewer(page);
+  const { viewer } = await openViewer(page);
   await page.keyboard.press("Escape");
   await expect(page.getByRole("region", { name: "How to view" })).toBeHidden();
   await expect(viewer).toBeVisible();
   await page.keyboard.press("Escape");
   await expectCreate(page);
-  expect(errors).toEqual([]);
 });
 
 test("leaving full screen closes the instructions first, then the viewer", async ({ page }) => {
-  const { viewer, errors } = await openViewer(page);
+  const { viewer } = await openViewer(page);
   const fullscreen = () => page.evaluate(() => document.fullscreenElement !== null);
   test.skip(!(await fullscreen()), "This browser doesn't go full screen");
   await page.evaluate(() => document.exitFullscreen());
@@ -79,16 +75,14 @@ test("leaving full screen closes the instructions first, then the viewer", async
   await expect.poll(fullscreen).toBe(true);
   await page.evaluate(() => document.exitFullscreen());
   await expectCreate(page);
-  expect(errors).toEqual([]);
 });
 
 test("going back leaves the viewer, not the app", async ({ page }) => {
-  const { errors } = await openViewer(page);
+  await openViewer(page);
   const url = page.url();
   await page.goBack();
   await expectCreate(page);
   expect(page.url()).toBe(url);
-  expect(errors).toEqual([]);
 });
 
 test("the alignment dots sit one far-plane strip apart above the image", async ({ page }) => {

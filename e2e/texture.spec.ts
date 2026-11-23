@@ -1,10 +1,10 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./guard.ts";
 import { openLayers as open, renders, settledPixels } from "./preview.ts";
 
 test("switching pattern and palette changes the preview, and undo restores it", async ({
   page,
 }) => {
-  const { canvas, violations, errors } = await open(page);
+  const { canvas } = await open(page);
   const original = await settledPixels(canvas, (await renders(canvas)) - 1);
 
   const seen = new Set([original]);
@@ -37,12 +37,10 @@ test("switching pattern and palette changes the preview, and undo restores it", 
   await expect(page.getByRole("radio", { name: "Dots" })).toBeChecked();
   await expect(page.getByRole("radio", { name: "Mono" })).toBeChecked();
   expect(await settledPixels(canvas, (await renders(canvas)) - 1)).toBe(original);
-  expect(violations).toEqual([]);
-  expect(errors).toEqual([]);
 });
 
 test("the pattern settings follow the chosen generator", async ({ page }) => {
-  const { errors } = await open(page);
+  await open(page);
   await expect(page.getByRole("slider", { name: "Dot density" })).toBeVisible();
   await page.getByRole("radio", { name: "Marble" }).check();
   await expect(page.getByRole("slider", { name: "Detail" })).toBeVisible();
@@ -51,7 +49,6 @@ test("the pattern settings follow the chosen generator", async ({ page }) => {
   await expect(page.getByRole("slider", { name: "Edge shading" })).toBeVisible();
   await page.getByRole("radio", { name: "Noise" }).check();
   await expect(page.getByRole("slider", { name: "Edge shading" })).toHaveCount(0);
-  expect(errors).toEqual([]);
 });
 
 const HALF_SKY = new URL("fixtures/half-sky.png", import.meta.url);
@@ -59,7 +56,7 @@ const HALF_SKY = new URL("fixtures/half-sky.png", import.meta.url);
 test("an uploaded tile changes the preview, warns about flat areas and takes jitter", async ({
   page,
 }) => {
-  const { canvas, violations, errors } = await open(page);
+  const { canvas } = await open(page);
   const original = await settledPixels(canvas, (await renders(canvas)) - 1);
 
   await page.getByRole("radio", { name: "Tile" }).check();
@@ -82,12 +79,10 @@ test("an uploaded tile changes the preview, warns about flat areas and takes jit
   count = await renders(canvas);
   await page.getByRole("radio", { name: "1/2" }).check();
   expect(await settledPixels(canvas, count)).not.toBe(jittered);
-  expect(violations).toEqual([]);
-  expect(errors).toEqual([]);
 });
 
 test("a custom palette with colours of equal brightness shows a warning", async ({ page }) => {
-  const { canvas, violations, errors } = await open(page);
+  const { canvas } = await open(page);
   await page.getByRole("radio", { name: "Custom" }).check();
   await expect(page.getByLabel("Colour 1", { exact: true })).toHaveValue("#000000");
   await expect(page.getByText(/too similar in brightness/)).toHaveCount(0);
@@ -97,6 +92,4 @@ test("a custom palette with colours of equal brightness shows a warning", async 
   await page.getByLabel("Colour 2", { exact: true }).fill("#7f7f7f");
   await expect(page.getByText(/too similar in brightness/)).toBeVisible();
   await settledPixels(canvas, count);
-  expect(violations).toEqual([]);
-  expect(errors).toEqual([]);
 });

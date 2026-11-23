@@ -1,11 +1,12 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
+import { expect, test } from "./guard.ts";
 import { layerNames, openLayers, settledPixels, toolbarAction } from "./preview.ts";
 
 test("a copied link opens the same scene in a new page", async ({ page, context, browserName }) => {
   if (browserName === "chromium") {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   }
-  const { canvas, list, violations, errors } = await openLayers(page);
+  const { canvas, list } = await openLayers(page);
   await page.getByRole("button", { name: "Add text" }).click();
   await page.getByRole("button", { name: "Add drawing" }).click();
   await expect(layerNames(list)).toHaveText(["Drawing", "Text", "Sphere"]);
@@ -46,21 +47,14 @@ test("a copied link opens the same scene in a new page", async ({ page, context,
   await expect(opened.getByRole("radio", { name: "Depth" })).toBeChecked();
   await expect(shared.canvas).toHaveAttribute("data-output", "depth");
   expect(await settledPixels(shared.canvas, 0)).toBe(depth);
-
-  for (const watched of [{ violations, errors }, shared]) {
-    expect(watched.violations).toEqual([]);
-    expect(watched.errors).toEqual([]);
-  }
 });
 
 test("a damaged link shows an error and opens the default scene", async ({ page }) => {
-  const { list, violations, errors } = await openLayers(page, "#r=1.AAAAbroken");
+  const { list } = await openLayers(page, "#r=1.AAAAbroken");
   await expect(page.getByRole("alert")).toContainText("damaged or incomplete");
   await expect(layerNames(list)).toHaveText(["Sphere"]);
   await page.getByRole("button", { name: "Dismiss" }).click();
   await expect(page.getByRole("alert")).toBeHidden();
-  expect(violations).toEqual([]);
-  expect(errors).toEqual([]);
 });
 
 /** Checks the control is wholly on screen, inside the toolbar's side padding, and on top. */
@@ -91,7 +85,7 @@ for (const width of [undefined, 375, 360, 320]) {
     if (width !== undefined) {
       await page.setViewportSize({ width, height: Math.round(width * 2) });
     }
-    const { violations, errors } = await openLayers(page);
+    await openLayers(page);
     await page.getByRole("button", { name: "New seed" }).click();
     await page.getByRole("button", { name: "Undo" }).click();
     const toolbar = page.locator(".toolbar");
@@ -123,7 +117,5 @@ for (const width of [undefined, 375, 360, 320]) {
     await dialog.getByRole("button", { name: "Close" }).click();
     await page.getByRole("button", { name: "Redo" }).click();
     await expect(page.getByRole("button", { name: "Redo" })).toBeDisabled();
-    expect(violations).toEqual([]);
-    expect(errors).toEqual([]);
   });
 }

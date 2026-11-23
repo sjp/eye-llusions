@@ -1,12 +1,12 @@
-import { chromium, devices, expect, test, webkit, type Page } from "@playwright/test";
+import { chromium, devices, webkit, type Page } from "@playwright/test";
+import { expect, test, watchContext } from "./guard.ts";
 import { readdirSync } from "node:fs";
-import { watchPage } from "./guard.ts";
 import { layerNames, openLayers, renders, settledPixels } from "./preview.ts";
 
 test("a text layer types live, undoes per burst and has distinct edge profiles", async ({
   page,
 }) => {
-  const { canvas, list, violations, errors } = await openLayers(page);
+  const { canvas, list } = await openLayers(page);
   let count = await renders(canvas);
   await page.getByRole("radio", { name: "Depth" }).click();
   const sphere = await settledPixels(canvas, count);
@@ -47,23 +47,25 @@ test("a text layer types live, undoes per burst and has distinct edge profiles",
     "href",
     /OFL.*\.txt$/,
   );
-  expect(violations).toEqual([]);
-  expect(errors).toEqual([]);
 });
 
-test("a font that fails to load shows an error until it loads", async ({ page, context }) => {
-  const { canvas } = await openLayers(page);
-  await context.route("**/*.woff2", (route) => route.abort());
-  // Console errors are expected here: the aborted font requests log them.
-  await page.getByRole("button", { name: "Add text" }).click();
-  const alert = page.getByRole("alert");
-  await expect(alert).toContainText("the font Anton couldn't be loaded");
+test.describe(() => {
+  // The aborted font requests log console errors.
+  test.use({ consoleErrors: "allow" });
 
-  await context.unrouteAll();
-  const count = await renders(canvas);
-  await page.getByRole("slider", { name: "Size" }).fill("0.4");
-  await expect(alert).toBeHidden();
-  await settledPixels(canvas, count);
+  test("a font that fails to load shows an error until it loads", async ({ page, context }) => {
+    const { canvas } = await openLayers(page);
+    await context.route("**/*.woff2", (route) => route.abort());
+    await page.getByRole("button", { name: "Add text" }).click();
+    const alert = page.getByRole("alert");
+    await expect(alert).toContainText("the font Anton couldn't be loaded");
+
+    await context.unrouteAll();
+    const count = await renders(canvas);
+    await page.getByRole("slider", { name: "Size" }).fill("0.4");
+    await expect(alert).toBeHidden();
+    await settledPixels(canvas, count);
+  });
 });
 
 const TEXT_RECIPE = {
@@ -103,7 +105,6 @@ const HEIGHT = 270;
 
 /** Renders the recipe's depth map at a fixed size in the app's own worker. */
 async function renderDepth(page: Page, workerUrl: string): Promise<number[]> {
-  const { errors, violations } = await watchPage(page);
   await page.goto("./");
   const depth = await page.evaluate(
     async ([url, recipe, width, height]) => {
@@ -147,8 +148,6 @@ async function renderDepth(page: Page, workerUrl: string): Promise<number[]> {
     },
     [workerUrl, TEXT_RECIPE, WIDTH, HEIGHT] as const,
   );
-  expect(violations).toEqual([]);
-  expect(errors).toEqual([]);
   return depth;
 }
 
@@ -171,7 +170,10 @@ test("text renders the same in desktop and mobile browsers", async ({ page }, te
     const browser = await engine.launch();
     try {
       const context = await browser.newContext({ ...device, baseURL: page.url() });
+      const watched = await watchContext(context);
       const depth = await renderDepth(await context.newPage(), workerUrl);
+      expect(watched.violations).toEqual([]);
+      expect(watched.errors).toEqual([]);
       let total = 0;
       let largest = 0;
       for (let i = 0; i < depth.length; i++) {

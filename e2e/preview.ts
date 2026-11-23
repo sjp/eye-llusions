@@ -1,5 +1,5 @@
-import { expect, type Locator, type Page } from "@playwright/test";
-import { watchPage } from "./guard.ts";
+import type { Locator, Page } from "@playwright/test";
+import { expect } from "./guard.ts";
 
 /** Opens a share link's `#r=…` fragment, or else the gallery and then a blank scene. */
 export async function openCreate(page: Page, hash = "") {
@@ -11,7 +11,6 @@ export async function openCreate(page: Page, hash = "") {
 
 /** Opens the Create screen, or a share link's `#r=…` fragment, with the controls showing. */
 export async function openLayers(page: Page, hash = "") {
-  const watched = await watchPage(page);
   await openCreate(page, hash);
   const canvas = page.locator(".preview-canvas");
   await expect(canvas).toHaveAttribute("data-quality", "full");
@@ -20,7 +19,7 @@ export async function openLayers(page: Page, hash = "") {
     await handle.click();
   }
   const list = page.getByRole("list", { name: "Layer stack, top first" });
-  return { ...watched, canvas, list };
+  return { canvas, list };
 }
 
 /** Layer names as listed, top first. */
