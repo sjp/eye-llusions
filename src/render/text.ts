@@ -41,6 +41,9 @@ function measureLines(context: OffscreenCanvasRenderingContext2D, text: string):
   });
 }
 
+/** Texts whose measurements are kept, most recently used last. */
+const MEASURED_TEXTS = 16;
+
 /**
  * Rasterises text layers with an `OffscreenCanvas`. Each line is one line height
  * (`size`) tall with the font's em set to it; capitals sit centred within their line,
@@ -50,6 +53,8 @@ function measureLines(context: OffscreenCanvasRenderingContext2D, text: string):
  */
 export function createTextRasteriser(load = loadFont): Rasteriser<TextLayer> {
   let canvas: OffscreenCanvas | undefined;
+  // Measurements are taken at the reference size, so they depend only on font and text.
+  const measured = new Map<string, Line[]>();
   return async (layer, { width, height, target }) => {
     const family = await load(layer.font);
     if (layer.text.trim() === "") {
@@ -60,8 +65,19 @@ export function createTextRasteriser(load = loadFont): Rasteriser<TextLayer> {
     if (context === null) {
       throw new Error("text layers need a 2D canvas");
     }
-    context.font = `${String(REFERENCE_SIZE)}px "${family}"`;
-    const lines = measureLines(context, layer.text);
+    const key = `${family}\n${layer.text}`;
+    let lines = measured.get(key);
+    if (lines === undefined) {
+      context.font = `${String(REFERENCE_SIZE)}px "${family}"`;
+      lines = measureLines(context, layer.text);
+    } else {
+      measured.delete(key);
+    }
+    measured.set(key, lines);
+    if (measured.size > MEASURED_TEXTS) {
+      const [oldest = key] = measured.keys();
+      measured.delete(oldest);
+    }
 
     const capHeight = FONTS.find((font) => font.id === layer.font)?.capHeight ?? 0.7;
     const em = Math.max(1, Math.round(layer.size * height));
