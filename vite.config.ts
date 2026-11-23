@@ -55,8 +55,8 @@ export const CACHE_DIR = fileURLToPath(new URL("node_modules/.vite", import.meta
  */
 const TEST_TIME = Date.UTC(2026, 2, 14, 15, 9, 26);
 
-/** Kept out of every Vitest run. */
-export const TEST_EXCLUDE = ["**/.claude/**", "e2e/**"];
+/** Kept out of every Vitest run. scripts/ has its own `node --test` tests. */
+export const TEST_EXCLUDE = ["**/.claude/**", "e2e/**", "scripts/**"];
 
 // https://vite.dev/config/
 export default defineConfig({

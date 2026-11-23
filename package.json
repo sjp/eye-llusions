@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "check": "oxlint --deny-warnings --report-unused-disable-directives && oxfmt --check && node scripts/unused-exports.mjs",
+    "check": "oxlint --deny-warnings --report-unused-disable-directives && oxfmt --check && node scripts/unused-exports.mjs && node --test scripts/",
     "fmt": "oxfmt",
     "figures": "node scripts/generate-figures.mjs",
     "test": "vitest run",

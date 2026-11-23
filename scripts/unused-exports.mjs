@@ -1,14 +1,17 @@
-// Reports exported symbols in src/ that no other module imports, and exits non-zero
-// if there are any. It is a regex scan, not a parser: it understands the import and
-// export forms this codebase uses, and treats `import * as`, `export * from` and
-// dynamic or URL imports of a module as using all of its exports.
+// Reports exported symbols in src/ (or the folder given as an argument) that no other
+// module imports, and exits non-zero if there are any. Apart from finding comments with
+// a parser, it is a regex scan: it understands the import and export forms this codebase
+// uses, and treats `import * as`, `export * from` and dynamic or URL imports of a module
+// as using all of its exports.
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseSync } from "vite";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const SRC = join(ROOT, "src");
+const DIR = process.argv.at(2);
+const SRC = DIR === undefined ? join(ROOT, "src") : resolve(DIR);
 const EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".mjs"];
 
 /**
@@ -30,11 +33,23 @@ function listSourceFiles(dir) {
 }
 
 /**
- * Removes comments so commented-out imports and exports don't count.
+ * Blanks out comments so commented-out imports and exports don't count. A parser finds
+ * them, so comment markers inside strings, templates, regexes and JSX text are left be.
+ * @param {string} file
  * @param {string} source
  */
-function stripComments(source) {
-  return source.replaceAll(/\/\*[\s\S]*?\*\//g, "").replaceAll(/(^|[^:"'`\\])\/\/.*$/gm, "$1");
+function stripComments(file, source) {
+  const { comments, errors } = parseSync(file, source);
+  if (errors.length > 0) {
+    throw new Error(`${relative(ROOT, file)}: ${errors.map((error) => error.message).join("; ")}`);
+  }
+  let stripped = "";
+  let end = 0;
+  for (const comment of comments) {
+    stripped += source.slice(end, comment.start) + " ";
+    end = comment.end;
+  }
+  return stripped + source.slice(end);
 }
 
 /**
@@ -106,7 +121,7 @@ function markUsed(file, name) {
 }
 
 for (const file of files) {
-  const source = stripComments(readFileSync(file, "utf8"));
+  const source = stripComments(file, readFileSync(file, "utf8"));
   /** @type {Set<string>} */
   const names = new Set();
   exported.set(file, names);
