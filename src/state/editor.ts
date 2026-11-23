@@ -21,6 +21,16 @@ type EditOptions = {
   coalesce?: string;
 };
 
+/**
+ * Bytes of images the undo history may keep alive, counting images that steps share
+ * once. Older steps are dropped past it.
+ */
+const HISTORY_BUDGET = 192 * 1024 * 1024;
+
+function assetBytes(recipe: Recipe): [Uint8Array, number][] {
+  return Object.values(recipe.assets).map(({ data }) => [data, data.byteLength]);
+}
+
 function randomSeed(): number {
   return crypto.getRandomValues(new Uint32Array(1))[0];
 }
@@ -57,7 +67,7 @@ export class Editor {
   readonly imagesUnsaved: ReadonlySignal<boolean>;
 
   constructor(initial: Recipe = defaultRecipe(), nextSeed: () => number = randomSeed) {
-    this.#history = new History(initial);
+    this.#history = new History(initial, { sizeOf: assetBytes, budget: HISTORY_BUDGET });
     this.#recipe = signal(initial);
     this.#saved = initial;
     this.#nextSeed = nextSeed;
