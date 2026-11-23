@@ -5,7 +5,7 @@ import { Editor } from "../state/editor.ts";
 import { linkPayload } from "../state/share.ts";
 import { ControlSheet, type SheetSnap } from "./ControlSheet.tsx";
 import { createDrawingTools, DrawingToolsContext } from "./drawing/tools.ts";
-import { Gallery } from "./gallery/Gallery.tsx";
+import { Gallery, type GalleryFocus } from "./gallery/Gallery.tsx";
 import type { GallerySample } from "./gallery/samples.ts";
 import { LayersPanel } from "./layers/LayersPanel.tsx";
 import { TexturePanel } from "./texture/TexturePanel.tsx";
@@ -76,6 +76,11 @@ export function App({
   const shareButton = useRef<HTMLButtonElement>(null);
   const saveButton = useRef<HTMLButtonElement>(null);
   const moreButton = useRef<HTMLButtonElement>(null);
+  const galleryButton = useRef<HTMLButtonElement>(null);
+  const createHeading = useRef<HTMLHeadingElement>(null);
+  /** Where focus goes once the open dialog has gone. */
+  const afterDialog = useRef<HTMLElement | null>(null);
+  const [galleryFocus, setGalleryFocus] = useState<GalleryFocus | undefined>(undefined);
   const compact = useMediaQuery(COMPACT_TOOLBAR);
   const fileInput = useRef<HTMLInputElement>(null);
   const [dialog, setDialog] = useState<Dialog>(undefined);
@@ -92,6 +97,7 @@ export function App({
     clearLink();
     setDialog(undefined);
     setNotice(undefined);
+    setGalleryFocus("heading");
     setScreen("gallery");
   }, [clearLink]);
   const createEntry = useCreateEntry(
@@ -139,6 +145,26 @@ export function App({
     wasViewing.current = viewing;
   }, [viewing]);
 
+  const shownScreen = useRef(screen);
+  useEffect(() => {
+    if (shownScreen.current !== screen && screen === "create") {
+      createHeading.current?.focus();
+    }
+    shownScreen.current = screen;
+  }, [screen]);
+
+  useEffect(() => {
+    if (dialog === undefined) {
+      afterDialog.current?.focus();
+      afterDialog.current = null;
+    }
+  }, [dialog]);
+
+  const closeDialog = (focus: HTMLElement | null): void => {
+    afterDialog.current = focus;
+    setDialog(undefined);
+  };
+
   if (viewing) {
     return (
       <Viewer editor={editor} renderer={renderer} onExit={exit} help={help} onHelp={setHelp} />
@@ -149,7 +175,9 @@ export function App({
     return (
       <Gallery
         renderer={thumbnailRenderer}
+        focus={galleryFocus}
         onView={(sample: GallerySample) => {
+          setGalleryFocus({ sample: sample.id });
           start(sample.recipe);
           enter();
         }}
@@ -187,9 +215,12 @@ export function App({
     <DrawingToolsContext.Provider value={tools}>
       <div class="shell" data-sheet={snap}>
         <header class="toolbar">
-          <h1>Eye-llusion</h1>
+          <h1 ref={createHeading} tabIndex={-1}>
+            Eye-llusion
+          </h1>
           <div class="toolbar-actions">
             <button
+              ref={galleryButton}
               type="button"
               class="button"
               aria-haspopup={editor.modified.value ? "dialog" : undefined}
@@ -296,8 +327,7 @@ export function App({
           <ShareDialog
             recipe={editor.recipe.value}
             onClose={() => {
-              setDialog(undefined);
-              (shareButton.current ?? moreButton.current)?.focus();
+              closeDialog(shareButton.current ?? moreButton.current);
             }}
             onDownloadPng={() => {
               setDialog("save");
@@ -315,8 +345,7 @@ export function App({
               editor.markSaved({ withAssets: true });
             }}
             onClose={() => {
-              setDialog(undefined);
-              (saveButton.current ?? moreButton.current)?.focus();
+              closeDialog(saveButton.current ?? moreButton.current);
             }}
           />
         )}
@@ -325,7 +354,7 @@ export function App({
             imagesOnly={editor.imagesUnsaved.value}
             onLeave={leave}
             onStay={() => {
-              setDialog(undefined);
+              closeDialog(galleryButton.current);
             }}
           />
         )}

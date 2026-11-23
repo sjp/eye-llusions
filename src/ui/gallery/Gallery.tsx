@@ -15,9 +15,13 @@ function thumbnailSize(recipe: Recipe) {
   return { width: THUMBNAIL_WIDTH, height: Math.round(THUMBNAIL_WIDTH / recipe.aspect) };
 }
 
+/** What to focus on opening the gallery: its heading, or a sample's View button. */
+export type GalleryFocus = "heading" | { sample: string };
+
 type Props = {
   /** Renders the thumbnails; defaults to a render worker of the gallery's own. */
   renderer?: Renderer | undefined;
+  focus?: GalleryFocus | undefined;
   onView: (sample: GallerySample) => void;
   onRemix: (sample: GallerySample) => void;
   onBlank: () => void;
@@ -130,14 +134,30 @@ function Thumbnail({ sample, failed }: { sample: GallerySample; failed: boolean 
 }
 
 /** The first screen: ready-made scenes to view or remix, or a blank start. */
-export function Gallery({ renderer: given, onView, onRemix, onBlank }: Props) {
+export function Gallery({ renderer: given, focus, onView, onRemix, onBlank }: Props) {
   const renderer = useRenderer(given);
   const list = useRef<HTMLUListElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
   const failed = useThumbnails(renderer, list);
+  // Only on opening the gallery.
+  const [opening] = useState(focus);
+
+  useEffect(() => {
+    if (opening === "heading") {
+      heading.current?.focus();
+    } else if (opening !== undefined) {
+      list.current
+        ?.querySelector<HTMLElement>(`[data-id="${opening.sample}"] .gallery-view`)
+        ?.focus();
+    }
+  }, [opening]);
+
   return (
     <main class="gallery">
       <header class="gallery-header">
-        <h1>Eye-llusion</h1>
+        <h1 ref={heading} tabIndex={-1}>
+          Eye-llusion
+        </h1>
         <p>
           Magic-eye pictures that hide a 3D scene in a pattern. View one to try your eyes, or remix
           it into a picture of your own.
@@ -154,7 +174,7 @@ export function Gallery({ renderer: given, onView, onRemix, onBlank }: Props) {
               <h2>{sample.title}</h2>
               <button
                 type="button"
-                class="button"
+                class="button gallery-view"
                 aria-label={`View ${sample.title}`}
                 onClick={() => {
                   onView(sample);

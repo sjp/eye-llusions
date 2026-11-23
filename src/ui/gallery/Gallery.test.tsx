@@ -124,6 +124,37 @@ describe("the gallery", () => {
     });
   });
 
+  test("leaving the viewer focuses the View button that opened it", async () => {
+    setup();
+    const view = screen.getByRole("button", { name: `View ${GALLERY[2].title}` });
+    fireEvent.click(view);
+    fireEvent.click(screen.getByRole("button", { name: "Exit" }));
+    await vi.waitFor(() => {
+      expect(document.activeElement?.getAttribute("aria-label")).toBe(`View ${GALLERY[2].title}`);
+    });
+  });
+
+  test("moving between the gallery and Create focuses the new screen's heading", () => {
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: `Remix ${first.title}` }));
+    expect(document.activeElement).toBe(screen.getByRole("heading", { level: 1 }));
+    expect(document.activeElement?.closest(".toolbar")).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Gallery" }));
+    expect(document.activeElement).toBe(screen.getByRole("heading", { level: 1 }));
+    expect(document.activeElement?.closest(".gallery")).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Start from blank" }));
+    expect(document.activeElement).toBe(screen.getByRole("heading", { level: 1 }));
+  });
+
+  test("keep editing returns focus to the Gallery button", () => {
+    const { editor } = setup();
+    fireEvent.click(screen.getByRole("button", { name: `Remix ${first.title}` }));
+    editor.newSeed();
+    fireEvent.click(screen.getByRole("button", { name: "Gallery" }));
+    fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Gallery" }));
+  });
+
   test("going back from an unchanged scene doesn't ask", () => {
     setup();
     fireEvent.click(screen.getByRole("button", { name: "Start from blank" }));
