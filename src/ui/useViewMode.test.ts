@@ -256,8 +256,8 @@ describe("useViewMode", () => {
     act(() => {
       result.current.enter();
     });
-    unmount();
-    window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+    act(unmount);
+    act(back);
     expect(exitFullscreen).not.toHaveBeenCalled();
   });
 });
