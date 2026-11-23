@@ -130,6 +130,28 @@ describe("compositeDepth", () => {
     expect(Array.from(depth)).toEqual([0.75, 0.75]);
   });
 
+  test("awaits the pause before each visible layer and stops when it throws", async () => {
+    const steps: string[] = [];
+    const registry: RasteriserRegistry = {
+      sample: (layer) => {
+        steps.push(`layer ${String(layer.size)}`);
+      },
+    };
+    const layers = recipe(flat(0.5), flat(0.25, { visible: false }), flat(0.75));
+    await compositeDepth(layers, 2, 1, registry, () => {
+      steps.push("pause");
+      return Promise.resolve();
+    });
+    expect(steps).toEqual(["pause", "layer 0.5", "pause", "layer 0.75"]);
+
+    let pauses = 0;
+    const stopped = compositeDepth(layers, 2, 1, registry, () => {
+      pauses++;
+      return pauses > 1 ? Promise.reject(new Error("stop")) : Promise.resolve();
+    });
+    await expect(stopped).rejects.toThrow("stop");
+  });
+
   test("rejects invalid sizes", async () => {
     await expect(compositeDepth(recipe(), 0, 1)).rejects.toThrow(RangeError);
     await expect(compositeDepth(recipe(), 1.5, 1)).rejects.toThrow(RangeError);

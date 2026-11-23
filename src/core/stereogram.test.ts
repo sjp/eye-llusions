@@ -150,7 +150,35 @@ describe("renderStereogram", () => {
     expect([...grey.subarray(0, 4)]).toEqual([50, 50, 50, 255]);
   });
 
+  test("rendering in bands of rows gives the same pixels as one pass", () => {
+    const depth = withRect(150, 250);
+    for (const mode of ["wall", "cross"] as const) {
+      const whole = render(depth, { mode, oversample: 2 });
+      const banded = new Uint8ClampedArray(WIDTH * HEIGHT * 4);
+      for (const [startRow, endRow] of [
+        [0, 1],
+        [1, 3],
+        [3, 3],
+        [3, 4],
+      ]) {
+        render(depth, { mode, oversample: 2, out: banded, startRow, endRow });
+      }
+      expect(banded).toEqual(whole);
+    }
+  });
+
+  test("leaves rows outside the band alone", () => {
+    const out = new Uint8ClampedArray(WIDTH * HEIGHT * 4);
+    render(flat(0), { out, startRow: 1, endRow: 2 });
+    expect(out.subarray(0, WIDTH * 4).every((value) => value === 0)).toBe(true);
+    expect(out.subarray(WIDTH * 4, WIDTH * 8).some((value) => value !== 0)).toBe(true);
+    expect(out.subarray(WIDTH * 8).every((value) => value === 0)).toBe(true);
+  });
+
   test("rejects inconsistent sizes", () => {
+    expect(() => render(flat(0), { startRow: 2, endRow: 1 })).toThrow(RangeError);
+    expect(() => render(flat(0), { endRow: HEIGHT + 1 })).toThrow(RangeError);
+    expect(() => render(flat(0), { startRow: 0.5 })).toThrow(RangeError);
     expect(() => render(new Float32Array(10))).toThrow(RangeError);
     expect(() => render(flat(0), { out: new Uint8ClampedArray(4) })).toThrow(RangeError);
     expect(() => render(flat(0), { oversample: 1.5 })).toThrow(RangeError);

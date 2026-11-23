@@ -22,6 +22,13 @@ export type StereogramOptions = {
   sample: (x: number, y: number) => number;
   /** Reused for the result when given; must hold `width × height × 4` bytes. */
   out?: Uint8ClampedArray;
+  /**
+   * Renders only rows `startRow` up to but not including `endRow` into `out`, leaving the
+   * rest alone. Rows don't depend on each other, so rendering in bands gives the same
+   * pixels as rendering all at once.
+   */
+  startRow?: number;
+  endRow?: number;
 };
 
 function assertPositiveInteger(name: string, value: number): void {
@@ -52,6 +59,13 @@ export function renderStereogram(options: StereogramOptions): Uint8ClampedArray 
   if (out.length !== width * height * 4) {
     throw new RangeError(`out must hold ${String(width * height * 4)} bytes`);
   }
+  const { startRow = 0, endRow = height } = options;
+  if (!Number.isInteger(startRow) || !Number.isInteger(endRow)) {
+    throw new RangeError("startRow and endRow must be integers");
+  }
+  if (startRow < 0 || endRow > height || startRow > endRow) {
+    throw new RangeError(`rows must lie within 0 to ${String(height)}`);
+  }
 
   const cross = mode === "cross";
   const w = width * oversample;
@@ -62,7 +76,7 @@ export function renderStereogram(options: StereogramOptions): Uint8ClampedArray 
   const same = new Int32Array(w);
   const colour = new Uint32Array(w);
 
-  for (let y = 0; y < height; y++) {
+  for (let y = startRow; y < endRow; y++) {
     const rowStart = y * width;
     let rowMax = 0;
     for (let x = 0; x < w; x++) {
