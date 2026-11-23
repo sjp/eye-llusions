@@ -95,7 +95,7 @@ export function App({
     }, [editor, toGallery]),
   );
   const wasViewing = useRef(false);
-  useUndoShortcuts(editor);
+  useUndoShortcuts(editor, screen === "create" && !viewing && dialog === undefined);
   useUnloadWarning(screen === "create" && editor.modified.value);
 
   const start = (recipe = defaultRecipe()): void => {

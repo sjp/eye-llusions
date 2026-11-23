@@ -92,6 +92,29 @@ describe("App", () => {
     expect(editor.recipe.value.view.repeats).toBe(12);
   });
 
+  test("keyboard shortcuts leave the scene alone behind dialogs and in the viewer", () => {
+    const { editor } = setup();
+    editor.setView({ repeats: 12 });
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true });
+    expect(editor.recipe.value.view.repeats).toBe(12);
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "View" }));
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true });
+    expect(editor.recipe.value.view.repeats).toBe(12);
+  });
+
+  test("keyboard shortcuts leave the hidden scene alone on the gallery", () => {
+    const { editor } = setup();
+    editor.setView({ repeats: 12 });
+    editor.markSaved({ withAssets: true });
+    fireEvent.click(screen.getByRole("button", { name: "Gallery" }));
+    expect(screen.getByRole("button", { name: "Start from blank" })).toBeTruthy();
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true });
+    expect(editor.recipe.value.view.repeats).toBe(12);
+  });
+
   test("the sheet handle toggles the sheet open and closed", () => {
     setup();
     const handle = screen.getByRole("button", { name: "Controls" });

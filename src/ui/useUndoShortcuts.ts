@@ -14,9 +14,12 @@ function editsText(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && target.isContentEditable;
 }
 
-/** Ctrl/Cmd+Z undoes; Ctrl/Cmd+Shift+Z and Ctrl+Y redo. */
-export function useUndoShortcuts(editor: Editor): void {
+/** Ctrl/Cmd+Z undoes; Ctrl/Cmd+Shift+Z and Ctrl+Y redo, while `enabled`. */
+export function useUndoShortcuts(editor: Editor, enabled: boolean): void {
   useEffect(() => {
+    if (!enabled) {
+      return undefined;
+    }
     const onKeyDown = (event: KeyboardEvent): void => {
       if (
         event.defaultPrevented ||
@@ -40,5 +43,5 @@ export function useUndoShortcuts(editor: Editor): void {
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [editor]);
+  }, [editor, enabled]);
 }
