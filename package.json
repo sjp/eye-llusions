@@ -10,6 +10,7 @@
     "check": "oxlint --deny-warnings --report-unused-disable-directives && oxfmt --check && node scripts/unused-exports.mjs && node --test scripts/",
     "fmt": "oxfmt",
     "figures": "node scripts/generate-figures.mjs",
+    "site-images": "node scripts/generate-site-images.ts",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage --testTimeout=30000",
     "test:perf": "vitest run --config vitest.perf.config.ts",

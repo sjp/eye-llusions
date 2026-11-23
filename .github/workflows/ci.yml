@@ -34,6 +34,11 @@ jobs:
           npm run figures
           git diff --exit-code src/assets/figures
           test -z "$(git status --porcelain src/assets/figures)"
+      - name: Check generated site images are up to date
+        run: |
+          npm run site-images
+          git diff --exit-code public
+          test -z "$(git status --porcelain public)"
       - run: npm run test:coverage
       # Wall-clock budgets tuned on a developer machine; shared runners can be slower.
       - name: Performance tests (non-blocking)
