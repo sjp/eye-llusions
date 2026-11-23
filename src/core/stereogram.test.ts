@@ -269,6 +269,45 @@ describe("renderStereogram", () => {
     }
   });
 
+  test("oversampling keeps the far plane's period and fills every pixel across depth edges", () => {
+    const depth = withRect(150, 250);
+    for (const mode of ["wall", "cross"] as const) {
+      for (const oversample of [2, 4]) {
+        const image = render(depth, { mode, oversample });
+        for (let i = 3; i < image.length; i += 4) {
+          expect(image[i]).toBe(255);
+        }
+        // Left of the square, the far plane links pixels a whole far strip apart.
+        for (let x = 0; x + FAR_PERIOD < 140; x++) {
+          expect(pixel(image, x, 1)).toBe(pixel(image, x + FAR_PERIOD, 1));
+        }
+      }
+    }
+  });
+
+  test("reads NaN and -Infinity depth as far and Infinity as near", () => {
+    expect(render(flat(Number.NaN))).toEqual(render(flat(0)));
+    expect(render(flat(-Infinity))).toEqual(render(flat(0)));
+    expect(render(flat(Infinity))).toEqual(render(flat(1)));
+    expect(render(flat(-0.5))).toEqual(render(flat(0)));
+    expect(render(flat(1.5))).toEqual(render(flat(1)));
+  });
+
+  test("a non-finite depth value doesn't change its neighbours", () => {
+    for (const mode of ["wall", "cross"] as const) {
+      for (const oversample of [1, 2]) {
+        const near = withRect(150, 250);
+        const reference = withRect(150, 250);
+        for (let y = 0; y < HEIGHT; y++) {
+          near[y * WIDTH + 200] = Infinity;
+          near[y * WIDTH + 50] = Number.NaN;
+          reference[y * WIDTH + 50] = 0;
+        }
+        expect(render(near, { mode, oversample })).toEqual(render(reference, { mode, oversample }));
+      }
+    }
+  });
+
   test("rejects inconsistent sizes", () => {
     expect(() => render(flat(0), { startRow: 2, endRow: 1 })).toThrow(RangeError);
     expect(() => render(flat(0), { endRow: HEIGHT + 1 })).toThrow(RangeError);

@@ -153,9 +153,13 @@ export function renderStereogram(options: StereogramOptions): Uint8ClampedArray 
       const i0 = source <= 0 ? 0 : Math.floor(source);
       const i1 = i0 + 1 < width ? i0 + 1 : width - 1;
       const f = source <= 0 ? 0 : source - i0;
-      const d0 = depth[rowStart + i0];
-      const d = d0 + (depth[rowStart + i1] - d0) * f;
-      const clamped = d > 0 ? (d < 1 ? d : 1) : 0;
+      // Clamped before interpolating, so NaN reads as far and Infinity as near without
+      // spreading to the neighbouring pixel.
+      const a = depth[rowStart + i0];
+      const b = depth[rowStart + i1];
+      const d0 = a > 0 ? (a < 1 ? a : 1) : 0;
+      const d1 = b > 0 ? (b < 1 ? b : 1) : 0;
+      const clamped = d0 + (d1 - d0) * f;
       z[x] = cross ? 1 - clamped : clamped;
       if (cross) {
         const zx = z[x];
