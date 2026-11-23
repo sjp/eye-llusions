@@ -39,6 +39,12 @@ function useThumbnails(renderer: Renderer, list: { current: HTMLElement | null }
 
   useEffect(() => {
     mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
     const element = list.current;
     if (typeof IntersectionObserver !== "function" || element === null) {
       return undefined;
@@ -60,7 +66,6 @@ function useThumbnails(renderer: Renderer, list: { current: HTMLElement | null }
       observer.observe(card);
     }
     return () => {
-      mounted.current = false;
       observer.disconnect();
     };
   }, [list]);

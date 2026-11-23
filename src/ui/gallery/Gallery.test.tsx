@@ -1,10 +1,12 @@
-import { fireEvent, render, screen } from "@testing-library/preact";
-import { describe, expect, test, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/preact";
+import { options } from "preact";
+import { describe, expect, onTestFinished, test, vi } from "vitest";
 import type { RenderImage } from "../../render/client.ts";
 import { Editor } from "../../state/editor.ts";
 import { encodeRecipe, shareUrl } from "../../state/share.ts";
 import { App } from "../App.tsx";
 import type { Renderer } from "../Preview.tsx";
+import { Gallery } from "./Gallery.tsx";
 import { GALLERY } from "./samples.ts";
 
 type Call = { recipe: unknown; resolve: (image: RenderImage) => void };
@@ -60,6 +62,47 @@ describe("the gallery", () => {
       );
     });
     vi.unstubAllGlobals();
+  });
+
+  test("a thumbnail render that ends after leaving the gallery updates nothing", async () => {
+    vi.stubGlobal("IntersectionObserver", undefined);
+    onTestFinished(() => {
+      vi.unstubAllGlobals();
+    });
+    const fails: ((error: Error) => void)[] = [];
+    const thumbnails: Renderer = {
+      render: vi.fn<Renderer["render"]>(
+        () =>
+          new Promise((_resolve, reject) => {
+            fails.push(reject);
+          }),
+      ),
+    };
+    render(
+      <Gallery renderer={thumbnails} onView={() => {}} onRemix={() => {}} onBlank={() => {}} />,
+    );
+    await vi.waitFor(() => {
+      expect(fails).toHaveLength(1);
+    });
+    cleanup();
+    // Effect cleanups run after the next paint.
+    await vi.advanceTimersByTimeAsync(100);
+    // A state update on the unmounted gallery would schedule a render.
+    const debounce = Object.getOwnPropertyDescriptor(options, "debounceRendering");
+    const scheduled = vi.fn<(callback: () => void) => void>((callback) => {
+      callback();
+    });
+    options.debounceRendering = scheduled;
+    onTestFinished(() => {
+      if (debounce === undefined) {
+        Reflect.deleteProperty(options, "debounceRendering");
+      } else {
+        Object.defineProperty(options, "debounceRendering", debounce);
+      }
+    });
+    fails[0](new Error("Worker failed"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(scheduled).not.toHaveBeenCalled();
   });
 
   test("remix opens the sample in Create with nothing to undo", () => {
