@@ -40,7 +40,19 @@ jobs:
         continue-on-error: true
         run: npm run test:perf -- --reporter=verbose --reporter=github-actions
       - run: npm run build
-      - run: npx playwright install --with-deps chromium webkit
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+      - if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium webkit
+      - if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium webkit
       # Tests the dist/ build that gets deployed instead of building again.
       - run: npm run test:browser
         env:
