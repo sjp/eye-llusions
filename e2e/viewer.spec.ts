@@ -54,9 +54,30 @@ test("the viewer fills the screen and the Exit button leaves it", async ({ page 
   expect(errors).toEqual([]);
 });
 
-test("Escape leaves the viewer", async ({ page }) => {
-  const { errors } = await openViewer(page);
+test("Escape closes the instructions, then leaves the viewer", async ({ page }) => {
+  const { viewer, errors } = await openViewer(page);
   await page.keyboard.press("Escape");
+  await expect(page.getByRole("region", { name: "How to view" })).toBeHidden();
+  await expect(viewer).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expectCreate(page);
+  expect(errors).toEqual([]);
+});
+
+test("leaving full screen closes the instructions first, then the viewer", async ({ page }) => {
+  const { viewer, errors } = await openViewer(page);
+  const fullscreen = () => page.evaluate(() => document.fullscreenElement !== null);
+  test.skip(!(await fullscreen()), "This browser doesn't go full screen");
+  await page.evaluate(() => document.exitFullscreen());
+  await expect(page.getByRole("region", { name: "How to view" })).toBeHidden();
+  await expect(viewer).toBeVisible();
+  expect(await page.evaluate(() => document.activeElement?.tagName)).toBe("BUTTON");
+
+  await viewer.getByRole("button", { name: "Exit" }).click();
+  await expectCreate(page);
+  await page.getByRole("button", { name: "View" }).click();
+  await expect.poll(fullscreen).toBe(true);
+  await page.evaluate(() => document.exitFullscreen());
   await expectCreate(page);
   expect(errors).toEqual([]);
 });

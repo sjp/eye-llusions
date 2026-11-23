@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/preact";
+import { useState } from "preact/hooks";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { Editor } from "../state/editor.ts";
 import type { Renderer } from "./Preview.tsx";
@@ -16,6 +17,23 @@ function setup(mode: "wall" | "cross" = "wall") {
     <Viewer editor={editor} renderer={renderer} onExit={onExit} help={true} onHelp={onHelp} />,
   );
   return { editor, onExit, onHelp };
+}
+
+/** A viewer whose instructions open and close as the app's do. */
+function setupWithHelp() {
+  const editor = new Editor();
+  const renderer: Renderer = {
+    render: vi.fn<Renderer["render"]>(() => new Promise(() => {})),
+  };
+  const onExit = vi.fn<() => void>();
+  function Harness() {
+    const [help, setHelp] = useState(true);
+    return (
+      <Viewer editor={editor} renderer={renderer} onExit={onExit} help={help} onHelp={setHelp} />
+    );
+  }
+  render(<Harness />);
+  return { onExit };
 }
 
 describe("Viewer", () => {
@@ -57,6 +75,16 @@ describe("Viewer", () => {
     fireEvent.click(toggle);
     expect(onHelp).toHaveBeenCalledTimes(2);
     expect(onHelp).toHaveBeenLastCalledWith(false);
+  });
+
+  test("Got it returns focus to the button that opens the instructions", () => {
+    const { onExit } = setupWithHelp();
+    const gotIt = screen.getByRole("button", { name: "Got it" });
+    gotIt.focus();
+    fireEvent.click(gotIt);
+    expect(screen.queryByRole("region", { name: "How to view" })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "How to view" }));
+    expect(onExit).not.toHaveBeenCalled();
   });
 
   test("only the advice is a live region", () => {

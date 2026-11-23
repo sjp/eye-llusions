@@ -61,7 +61,17 @@ export function App({
   const [tools] = useState(createDrawingTools);
   const [snap, setSnap] = useState<SheetSnap>("peek");
   const [help, setHelp] = useState(true);
-  const { viewing, enter, exit } = useViewMode();
+  const helpOpen = useRef(help);
+  helpOpen.current = help;
+  const { viewing, enter, exit } = useViewMode(() => {
+    // The instructions are the only thing that opens inside the viewer.
+    if (!helpOpen.current) {
+      return false;
+    }
+    helpOpen.current = false;
+    setHelp(false);
+    return true;
+  });
   const viewButton = useRef<HTMLButtonElement>(null);
   const shareButton = useRef<HTMLButtonElement>(null);
   const saveButton = useRef<HTMLButtonElement>(null);

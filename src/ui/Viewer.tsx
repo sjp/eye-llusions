@@ -144,6 +144,7 @@ function HowTo({ mode, onClose }: { mode: "wall" | "cross"; onClose: () => void 
 export function Viewer({ editor, renderer, onExit, help, onHelp }: Props) {
   const areaRef = useRef<HTMLDivElement>(null);
   const exitRef = useRef<HTMLButtonElement>(null);
+  const helpRef = useRef<HTMLButtonElement>(null);
   const area = useSize(areaRef);
   const [context] = useState(viewingContext);
   const [peeking, setPeeking] = useState(false);
@@ -152,6 +153,14 @@ export function Viewer({ editor, renderer, onExit, help, onHelp }: Props) {
   useEffect(() => {
     exitRef.current?.focus();
   }, []);
+
+  // Closing the instructions from inside them leaves focus nowhere.
+  useEffect(() => {
+    const focused = document.activeElement;
+    if (!help && (focused === null || focused === document.body)) {
+      helpRef.current?.focus();
+    }
+  }, [help]);
 
   const width = Math.max(0, Math.min(area.width, (area.height - DOT_ROW) * aspect));
   const height = width / aspect;
@@ -192,6 +201,7 @@ export function Viewer({ editor, renderer, onExit, help, onHelp }: Props) {
           </button>
         </div>
         <button
+          ref={helpRef}
           type="button"
           class="button"
           aria-expanded={help}

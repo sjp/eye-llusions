@@ -147,6 +147,20 @@ describe("App", () => {
     expect(handle.getAttribute("aria-expanded")).not.toBe(expanded);
   });
 
+  test("Escape closes the viewer's instructions before the viewer", async () => {
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: "View" }));
+    screen.getByRole("button", { name: "Got it" }).focus();
+    fireEvent.keyDown(document.activeElement ?? window, { key: "Escape" });
+    expect(screen.queryByRole("region", { name: "How to view" })).toBeNull();
+    expect(screen.getByRole("dialog", { name: "Viewer" })).toBeTruthy();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "How to view" }));
+    fireEvent.keyDown(document.activeElement ?? window, { key: "Escape" });
+    await vi.waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Viewer" })).toBeNull();
+    });
+  });
+
   test("View opens the viewer and going back closes it", async () => {
     setup();
     fireEvent.click(screen.getByRole("button", { name: "View" }));
