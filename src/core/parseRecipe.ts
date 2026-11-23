@@ -161,6 +161,10 @@ function id(value: unknown, path: string): string {
   if (!ID_PATTERN.test(result)) {
     throw new RecipeError(path, "IDs may only contain letters, digits, _ and -");
   }
+  // IDs key plain objects, where these names would read or set inherited properties.
+  if (Object.hasOwn(Object.prototype, result)) {
+    throw new RecipeError(path, `${result} is reserved and can't be an ID`);
+  }
   return result;
 }
 
@@ -485,7 +489,6 @@ function assets(value: unknown, path: string): Record<string, Asset> {
     }
     return [key, entry];
   });
-  // fromEntries defines own properties, so an ID such as __proto__ stays plain data.
   return Object.fromEntries(entries);
 }
 

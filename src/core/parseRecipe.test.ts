@@ -171,17 +171,6 @@ describe("parseRecipe accepts", () => {
     });
   });
 
-  test("an asset ID of __proto__, kept as plain data", () => {
-    const input = {};
-    Object.defineProperty(input, "__proto__", {
-      value: { format: "gray", width: 1, height: 1, data: new Uint8Array(1) },
-      enumerable: true,
-    });
-    const { assets } = parseRecipe(withValue("assets", input));
-    expect(Object.getPrototypeOf(assets)).toBe(Object.prototype);
-    expect(Object.hasOwn(assets, "__proto__")).toBe(true);
-  });
-
   test("a recipe exactly at the layer and stroke limits", () => {
     const drawing: Layer = {
       kind: "drawing",
@@ -403,6 +392,31 @@ describe("parseRecipe rejects", () => {
   test("an over-long unknown key without echoing all of it", () => {
     const error = errorOf(withValue("k".repeat(100_000), 1));
     expect(error.message.length).toBeLessThan(200);
+  });
+
+  test("an asset ID of __proto__", () => {
+    const input = {};
+    Object.defineProperty(input, "__proto__", {
+      value: { format: "gray", width: 1, height: 1, data: new Uint8Array(1) },
+      enumerable: true,
+    });
+    expect(errorOf(withValue("assets", input)).path).toBe("assets.__proto__");
+  });
+
+  test.each([
+    ["an asset ID", "assets.constructor", fullRecipe().assets.tile, "assets.constructor"],
+    ["a reference to an asset", "layers.4.asset", "toString", "layers[4].asset"],
+    [
+      "a tile reference",
+      "texture.generator",
+      { type: "tile", asset: "hasOwnProperty", divisions: 1, jitter: 0 },
+      "texture.generator.asset",
+    ],
+    ["a layer ID", "layers.0.id", "valueOf", "layers[0].id"],
+  ])("a name from Object.prototype as %s", (_, path, value, errorPath) => {
+    const error = errorOf(withValue(path, value));
+    expect(error.path).toBe(errorPath);
+    expect(error.message).toContain("reserved");
   });
 
   test("a zigzag stroke that would take too long to draw", () => {
