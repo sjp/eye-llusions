@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { fromBase64Url, toBase64Url } from "./bytes.ts";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { compress, decompress, fromBase64Url, toBase64Url } from "./bytes.ts";
 
 const toNative = Object.getOwnPropertyDescriptor(Uint8Array.prototype, "toBase64");
 const fromNative = Object.getOwnPropertyDescriptor(Uint8Array, "fromBase64");
@@ -65,4 +65,42 @@ test("the fallback runs when the native methods are missing", () => {
   } finally {
     restoreNative();
   }
+});
+
+describe.each(["deflate-raw", "gzip"] as const)("compression (%s)", (format) => {
+  const text = new TextEncoder().encode("stereogram ".repeat(1000));
+
+  test("decompresses what it compresses, empty input included", async () => {
+    const packed = await compress(text, format);
+    expect(packed.length).toBeLessThan(text.length / 10);
+    expect(await decompress(packed, format)).toEqual(text);
+    expect(await decompress(await compress(new Uint8Array(), format), format)).toEqual(
+      new Uint8Array(),
+    );
+  });
+
+  test("decompresses output of exactly the limit", async () => {
+    const packed = await compress(text, format);
+    expect(await decompress(packed, format, text.length)).toEqual(text);
+  });
+
+  test("stops reading and rejects with RangeError past the limit", async () => {
+    const cancel = vi.spyOn(ReadableStreamDefaultReader.prototype, "cancel");
+    try {
+      const packed = await compress(text, format);
+      await expect(decompress(packed, format, text.length - 1)).rejects.toThrow(RangeError);
+      expect(cancel).toHaveBeenCalledOnce();
+    } finally {
+      cancel.mockRestore();
+    }
+  });
+
+  test("rejects corrupt data, but not with RangeError", async () => {
+    const packed = await compress(text, format);
+    const damaged = packed.slice(0, packed.length >> 1);
+    damaged[damaged.length - 1] ^= 0xff;
+    const error: unknown = await decompress(damaged, format).catch((reason: unknown) => reason);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(RangeError);
+  });
 });
