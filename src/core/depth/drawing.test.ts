@@ -53,6 +53,16 @@ describe("rasteriseDrawing", () => {
     }
   });
 
+  test("sharp turns and reversals keep the rounded brush around the joint", () => {
+    const vee = field([stroke([0.2, 0.2, 0.5, 0.5, 0.8, 0.2])]);
+    expect(coverageAt(vee, 50, 58)).toBe(1);
+    expect(coverageAt(vee, 50, 62)).toBe(0);
+    const reversal = field([stroke([0.2, 0.5, 0.6, 0.5, 0.3, 0.5])]);
+    expect(coverageAt(reversal, 68, 50)).toBe(1);
+    expect(coverageAt(reversal, 72, 50)).toBe(0);
+    expect(coverageAt(reversal, 12, 50)).toBe(1);
+  });
+
   test("the brush size is a fraction of the canvas height at any resolution", () => {
     const small = field([stroke([0.5, 0.5])], 100, 100);
     const large = field([stroke([0.5, 0.5])], 400, 400);

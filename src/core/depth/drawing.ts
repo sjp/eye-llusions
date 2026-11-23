@@ -7,6 +7,8 @@ type Bounds = { x0: number; y0: number; x1: number; y1: number };
 type Scratch = {
   size: number;
   mask: Float32Array;
+  /** Each row's first and last painted column in `mask`, or an empty span (width, -1). */
+  spans: Int32Array;
   rows: Float32Array;
   blurredHeight: Float32Array;
   blurredCoverage: Float32Array;
@@ -15,11 +17,18 @@ type Scratch = {
 
 let scratch: Scratch | undefined;
 
-function scratchFor(width: number, size: number): Scratch {
+function scratchFor(width: number, height: number): Scratch {
+  const size = width * height;
   if (scratch?.size !== size || scratch.sums.length !== width) {
+    const spans = new Int32Array(2 * height);
+    for (let y = 0; y < height; y++) {
+      spans[2 * y] = width;
+      spans[2 * y + 1] = -1;
+    }
     scratch = {
       size,
       mask: new Float32Array(size),
+      spans,
       rows: new Float32Array(size),
       blurredHeight: new Float32Array(size),
       blurredCoverage: new Float32Array(size),
@@ -34,76 +43,177 @@ function brushRadius(stroke: Stroke, height: number): number {
   return Math.max(0.5, (stroke.brush.size * height) / 2);
 }
 
+/** A row's interval of pixel-centre x positions, as [from, to]; empty when from > to. */
+type Range = Float64Array;
+
+/** Narrows `range` to the chord of a disc centred at `cx`, on a row `py` below its centre. */
+function chord(range: Range, cx: number, py: number, outerSquared: number): void {
+  const half = outerSquared - py * py;
+  if (half > 0) {
+    const reach = Math.sqrt(half);
+    range[0] = Math.max(range[0], cx - reach);
+    range[1] = Math.min(range[1], cx + reach);
+  } else {
+    range[0] = Infinity;
+  }
+}
+
+/**
+ * Narrows `range` to where `(x - vx) * nx + py * ny >= c`: a half-plane bounded near a
+ * vertex at `vx`, on a row `py` below the vertex.
+ */
+function halfPlane(range: Range, vx: number, py: number, nx: number, ny: number, c: number) {
+  const k = c - py * ny;
+  if (nx > 0) {
+    range[0] = Math.max(range[0], vx + k / nx);
+  } else if (nx < 0) {
+    range[1] = Math.min(range[1], vx + k / nx);
+  } else if (k > 0) {
+    range[0] = Infinity;
+  }
+}
+
 /**
  * Writes the stroke's footprint into `mask` as the strongest brush weight over its
- * length, from 1 in the middle of the brush to 0 outside it, and returns the pixels it
- * touched. Consecutive points are joined by straight segments.
+ * length, from 1 in the middle of the brush to 0 outside it, records each row's painted
+ * span in `spans`, and returns the pixels it touched. Consecutive points are joined by
+ * straight segments.
+ *
+ * Each pixel's weight comes from its distance to the nearest point of the stroke, so
+ * each segment visits only the pixels that may lie nearest to it: its band, the wedge
+ * of its start disc outside both it and the previous segment with any length, and, for
+ * the last segment, the half of its end disc beyond it. Each row visits only where it
+ * crosses those regions, so the work follows the painted area rather than the
+ * segments' bounding boxes.
  */
 function footprint(
   stroke: Stroke,
   width: number,
   height: number,
   mask: Float32Array,
+  spans: Int32Array,
 ): Bounds | undefined {
   const radius = brushRadius(stroke, height);
   // The falloff runs inwards from just outside the radius: one pixel of anti-aliasing for
   // a hard brush, up to the whole radius for the softest.
   const falloff = Math.max(1, stroke.brush.softness * radius);
+  const inverseFalloff = 1 / falloff;
   const outer = radius + 0.5;
+  const outerSquared = outer * outer;
   const reach = Math.ceil(outer);
   const { points } = stroke;
-  let bounds: Bounds | undefined;
+  let left = width;
+  let top = height;
+  let right = -1;
+  let bottom = -1;
   const count = points.length / 2;
-  for (let s = 0; s < Math.max(1, count - 1); s++) {
+  const segments = Math.max(1, count - 1);
+  const regions = [new Float64Array(2), new Float64Array(2), new Float64Array(2)];
+  let previousX = 0;
+  let previousY = 0;
+  for (let s = 0; s < segments; s++) {
     const ax = points[2 * s] * width;
     const ay = points[2 * s + 1] * height;
     const next = Math.min(s + 1, count - 1);
     const bx = points[2 * next] * width;
     const by = points[2 * next + 1] * height;
+    const dx = bx - ax;
+    const dy = by - ay;
+    const last = s === segments - 1;
+    const repeated = dx === 0 && dy === 0;
+    // A repeated point inside the stroke adds nothing: the segments either side of it
+    // paint its joint.
+    if (repeated && s > 0 && !last) {
+      continue;
+    }
     const x0 = Math.max(0, Math.floor(Math.min(ax, bx)) - reach);
     const x1 = Math.min(width - 1, Math.ceil(Math.max(ax, bx)) + reach);
     const y0 = Math.max(0, Math.floor(Math.min(ay, by)) - reach);
     const y1 = Math.min(height - 1, Math.ceil(Math.max(ay, by)) + reach);
-    if (x0 > x1 || y0 > y1) {
-      continue;
-    }
-    bounds =
-      bounds === undefined
-        ? { x0, y0, x1, y1 }
-        : {
-            x0: Math.min(bounds.x0, x0),
-            y0: Math.min(bounds.y0, y0),
-            x1: Math.max(bounds.x1, x1),
-            y1: Math.max(bounds.y1, y1),
-          };
-    const dx = bx - ax;
-    const dy = by - ay;
     const lengthSquared = dx * dx + dy * dy;
+    const band = outer * Math.sqrt(lengthSquared);
+    const inverseLength = lengthSquared > 0 ? 1 / lengthSquared : 0;
     for (let y = y0; y <= y1; y++) {
       const py = y + 0.5 - ay;
-      const row = y * width;
-      for (let x = x0; x <= x1; x++) {
-        const px = x + 0.5 - ax;
-        let t = lengthSquared > 0 ? (px * dx + py * dy) / lengthSquared : 0;
-        t = t < 0 ? 0 : t > 1 ? 1 : t;
-        const ex = px - t * dx;
-        const ey = py - t * dy;
-        const distanceSquared = ex * ex + ey * ey;
-        if (distanceSquared >= outer * outer) {
-          continue;
-        }
-        let u = (outer - Math.sqrt(distanceSquared)) / falloff;
-        if (u > 1) {
-          u = 1;
-        }
-        const weight = u * u * (3 - 2 * u);
-        if (weight > mask[row + x]) {
-          mask[row + x] = weight;
+      const [body, start, end] = regions;
+      // The band along the segment, between its ends and within the brush of its line.
+      body[0] = -Infinity;
+      body[1] = Infinity;
+      if (lengthSquared > 0) {
+        halfPlane(body, ax, py, dx, dy, 0);
+        halfPlane(body, bx, y + 0.5 - by, -dx, -dy, 0);
+        halfPlane(body, ax, py, -dy, dx, -band);
+        halfPlane(body, ax, py, dy, -dx, -band);
+      } else {
+        body[0] = Infinity;
+      }
+      // The start disc beyond the previous segment and before this one.
+      start[0] = -Infinity;
+      start[1] = Infinity;
+      chord(start, ax, py, outerSquared);
+      if (start[0] <= start[1]) {
+        halfPlane(start, ax, py, previousX, previousY, 0);
+        halfPlane(start, ax, py, -dx, -dy, 0);
+      }
+      // The end disc beyond the last segment. Without length, the start disc covers it.
+      end[0] = Infinity;
+      end[1] = -Infinity;
+      if (last && lengthSquared > 0) {
+        end[0] = -Infinity;
+        end[1] = Infinity;
+        chord(end, bx, y + 0.5 - by, outerSquared);
+        if (end[0] <= end[1]) {
+          halfPlane(end, bx, y + 0.5 - by, dx, dy, 0);
         }
       }
+      const row = y * width;
+      for (let r = 0; r < 3; r++) {
+        const range = regions[r];
+        // Pixel centres sit at x + 0.5. The brush weight is zero at the edge of the
+        // brush, and neighbouring regions share their boundaries, so rounding there
+        // can't change the result.
+        const from = Math.max(x0, Math.ceil(range[0] - 0.5));
+        const to = Math.min(x1, Math.floor(range[1] - 0.5));
+        if (from > to) {
+          continue;
+        }
+        for (let x = from; x <= to; x++) {
+          const px = x + 0.5 - ax;
+          let t = (px * dx + py * dy) * inverseLength;
+          t = t < 0 ? 0 : t > 1 ? 1 : t;
+          const ex = px - t * dx;
+          const ey = py - t * dy;
+          const distanceSquared = ex * ex + ey * ey;
+          if (distanceSquared >= outerSquared) {
+            continue;
+          }
+          let u = (outer - Math.sqrt(distanceSquared)) * inverseFalloff;
+          if (u > 1) {
+            u = 1;
+          }
+          const weight = u * u * (3 - 2 * u);
+          if (weight > mask[row + x]) {
+            mask[row + x] = weight;
+          }
+        }
+        if (from < spans[2 * y]) {
+          spans[2 * y] = from;
+        }
+        if (to > spans[2 * y + 1]) {
+          spans[2 * y + 1] = to;
+        }
+        left = Math.min(left, from);
+        right = Math.max(right, to);
+        top = Math.min(top, y);
+        bottom = Math.max(bottom, y);
+      }
+    }
+    if (!repeated) {
+      previousX = dx;
+      previousY = dy;
     }
   }
-  return bounds;
+  return right < 0 ? undefined : { x0: left, y0: top, x1: right, y1: bottom };
 }
 
 /**
@@ -176,7 +286,7 @@ function apply(
 ): void {
   const { width, height } = context;
   const { depth: heightField, coverage } = context.target;
-  const { mask, rows, blurredHeight, blurredCoverage, sums } = scratchBuffers;
+  const { mask, spans, rows, blurredHeight, blurredCoverage, sums } = scratchBuffers;
   const { mode, value } = stroke.brush;
   if (mode === "smooth") {
     const radius = Math.max(1, Math.round(brushRadius(stroke, height) / 3));
@@ -184,7 +294,8 @@ function apply(
     boxBlur(coverage, blurredCoverage, rows, sums, width, height, bounds, radius);
   }
   for (let y = bounds.y0; y <= bounds.y1; y++) {
-    for (let x = bounds.x0; x <= bounds.x1; x++) {
+    const end = spans[2 * y + 1];
+    for (let x = spans[2 * y]; x <= end; x++) {
       const i = y * width + x;
       const w = mask[i];
       if (w <= 0) {
@@ -224,17 +335,19 @@ function apply(
  */
 export function rasteriseDrawing(layer: DrawingLayer, context: RasterContext): void {
   const { width, height } = context;
-  const scratchBuffers = scratchFor(width, width * height);
-  const { mask } = scratchBuffers;
+  const scratchBuffers = scratchFor(width, height);
+  const { mask, spans } = scratchBuffers;
   const { depth: heightField, coverage } = context.target;
   for (const stroke of layer.strokes) {
-    const bounds = footprint(stroke, width, height, mask);
+    const bounds = footprint(stroke, width, height, mask, spans);
     if (bounds === undefined) {
       continue;
     }
     apply(stroke, context, bounds, scratchBuffers);
     for (let y = bounds.y0; y <= bounds.y1; y++) {
-      mask.fill(0, y * width + bounds.x0, y * width + bounds.x1 + 1);
+      mask.fill(0, y * width + spans[2 * y], y * width + spans[2 * y + 1] + 1);
+      spans[2 * y] = width;
+      spans[2 * y + 1] = -1;
     }
   }
   for (let i = 0; i < heightField.length; i++) {
