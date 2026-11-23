@@ -35,6 +35,10 @@ jobs:
           git diff --exit-code src/assets/figures
           test -z "$(git status --porcelain src/assets/figures)"
       - run: npm test
+      # Wall-clock budgets tuned on a developer machine; shared runners can be slower.
+      - name: Performance tests (non-blocking)
+        continue-on-error: true
+        run: npm run test:perf -- --reporter=verbose --reporter=github-actions
       - run: npm run build
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:browser
