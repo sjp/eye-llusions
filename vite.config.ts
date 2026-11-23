@@ -2,6 +2,7 @@ import { preact } from "@preact/preset-vite";
 import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
 import { configDefaults, defineConfig } from "vitest/config";
+import { linkPreview } from "./config/linkPreview.ts";
 
 /**
  * Content-Security-Policy for the built site. GitHub Pages can't send headers, so it
@@ -66,7 +67,7 @@ export default defineConfig({
   cacheDir: CACHE_DIR,
   // No react -> preact/compat aliases: the app imports preact directly, and an alias
   // would hide a stray react import instead of failing the build.
-  plugins: [preact({ reactAliasesEnabled: false }), contentSecurityPolicy()],
+  plugins: [preact({ reactAliasesEnabled: false }), contentSecurityPolicy(), linkPreview()],
   // Module workers keep the render worker a single same-origin file.
   worker: { format: "es" },
   // Never inline assets such as fonts as data: URLs, which the CSP blocks.
