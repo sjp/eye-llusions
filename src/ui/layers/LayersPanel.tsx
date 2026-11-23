@@ -5,9 +5,9 @@ import type { Asset, Layer } from "../../core/recipe.ts";
 import type { Editor } from "../../state/editor.ts";
 import {
   canAddLayer,
-  canDuplicateLayer,
   changeLayer,
   duplicateLayer,
+  duplicateProblem,
   insertLayer,
   moveLayer,
   removeLayer,
@@ -256,7 +256,7 @@ export function LayersPanel({
   /** The selected layer's ID, shared with the preview; kept locally if not given. */
   selection?: Signal<string | undefined>;
 }) {
-  const { layers } = editor.recipe.value;
+  const { layers, aspect } = editor.recipe.value;
   const local = useSignal<string | undefined>(undefined);
   const selectedId = (selection ?? local).value;
   const setSelectedId = (id: string | undefined): void => {
@@ -266,10 +266,16 @@ export function LayersPanel({
   const [over, setOver] = useState<string | undefined>(undefined);
   const selected = selectedLayer(layers, selectedId);
   const roomy = canAddLayer(layers);
-  const duplicable = selected !== undefined && canDuplicateLayer(layers, selected.id);
+  const problem = selected === undefined ? "layers" : duplicateProblem(layers, selected.id, aspect);
+  const duplicable = problem === undefined;
   const duplicateNoteId = useId();
   // Without room for a layer, the note under the add buttons already explains why.
-  const tooManyPoints = selected !== undefined && roomy && !duplicable;
+  const duplicateNote =
+    problem === "points"
+      ? `A copy would pass the limit of ${POINTS_TOTAL} drawn points in a picture.`
+      : problem === "drawingArea"
+        ? "A copy would pass the limit on how much drawing a picture can hold."
+        : undefined;
 
   const add = (kind: AddableKind): void => {
     const layer = withFreeIdentity(layers, kind.create(editor.recipe.value));
@@ -359,10 +365,10 @@ export function LayersPanel({
               type="button"
               class="button"
               disabled={!duplicable}
-              aria-describedby={tooManyPoints ? duplicateNoteId : undefined}
+              aria-describedby={duplicateNote === undefined ? undefined : duplicateNoteId}
               onClick={() => {
                 const before = new Set(layers.map((layer) => layer.id));
-                editor.updateLayers((current) => duplicateLayer(current, selected.id));
+                editor.updateLayers((current) => duplicateLayer(current, selected.id, aspect));
                 const copy = editor.recipe.peek().layers.find((layer) => !before.has(layer.id));
                 if (copy !== undefined) {
                   setSelectedId(copy.id);
@@ -383,9 +389,9 @@ export function LayersPanel({
               Delete
             </button>
           </div>
-          {tooManyPoints && (
+          {duplicateNote === undefined ? null : (
             <p class="panel-note" id={duplicateNoteId}>
-              A copy would pass the limit of {POINTS_TOTAL} drawn points in a picture.
+              {duplicateNote}
             </p>
           )}
           <LayerSettings key={selected.id} editor={editor} layer={selected} />

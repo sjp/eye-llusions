@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { strokeCost } from "../core/depth/drawing.ts";
 import { RECIPE_LIMITS } from "../core/parseRecipe.ts";
 import { defaultRecipe, type DrawingLayer, type Layer, type Stroke } from "../core/recipe.ts";
 import {
@@ -12,9 +13,13 @@ import {
   insertLayer,
   moveLayer,
   removeLayer,
+  duplicateProblem,
   selectedLayer,
+  strokeFits,
   strokeRoom,
 } from "./layers.ts";
+
+const ASPECT = 16 / 9;
 
 function layer(id: string, name = id): Layer {
   return { ...defaultRecipe().layers[0], id, name };
@@ -52,12 +57,12 @@ describe("layer stack operations", () => {
     expect(canAddLayer(full)).toBe(false);
     expect(canAddLayer(full.slice(1))).toBe(true);
     expect(insertLayer(full, layer("extra"))).toBe(full);
-    expect(duplicateLayer(full, "l0")).toBe(full);
+    expect(duplicateLayer(full, "l0", ASPECT)).toBe(full);
   });
 
   test("duplicates a deep copy above the original", () => {
     const layers = [layer("sample-1", "Sphere"), layer("sample-2", "Cone")];
-    const result = duplicateLayer(layers, "sample-1");
+    const result = duplicateLayer(layers, "sample-1", ASPECT);
     expect(ids(result)).toEqual(["sample-1", "sample-3", "sample-2"]);
     const [original, copy] = result;
     expect(copy).toEqual({ ...original, id: "sample-3", name: "Sphere copy" });
@@ -138,16 +143,65 @@ describe("selection and strokes", () => {
   test("won't duplicate a drawing past the recipe's point total", () => {
     const strokes = Array.from({ length: 7 }, () => strokeOf(4000));
     const layers: Layer[] = [drawing("d", strokes), layer("a")];
-    expect(canDuplicateLayer(layers, "d")).toBe(false);
-    expect(duplicateLayer(layers, "d")).toBe(layers);
-    expect(canDuplicateLayer(layers, "a")).toBe(true);
-    expect(canDuplicateLayer(layers, "missing")).toBe(false);
+    expect(canDuplicateLayer(layers, "d", ASPECT)).toBe(false);
+    expect(duplicateLayer(layers, "d", ASPECT)).toBe(layers);
+    expect(canDuplicateLayer(layers, "a", ASPECT)).toBe(true);
+    expect(canDuplicateLayer(layers, "missing", ASPECT)).toBe(false);
 
     const exact: Layer[] = [drawing("d", strokes.slice(0, 6)), drawing("e", [strokeOf(2000)])];
-    expect(canDuplicateLayer(exact, "d")).toBe(true);
-    expect(duplicateLayer(exact, "d")).toHaveLength(3);
+    expect(canDuplicateLayer(exact, "d", ASPECT)).toBe(true);
+    expect(duplicateLayer(exact, "d", ASPECT)).toHaveLength(3);
     const over: Layer[] = [drawing("d", strokes.slice(0, 6)), drawing("e", [strokeOf(2001)])];
-    expect(canDuplicateLayer(over, "d")).toBe(false);
-    expect(canDuplicateLayer(over, "e")).toBe(true);
+    expect(canDuplicateLayer(over, "d", ASPECT)).toBe(false);
+    expect(canDuplicateLayer(over, "e", ASPECT)).toBe(true);
+    expect(duplicateProblem(over, "d", ASPECT)).toBe("points");
+  });
+
+  // Crosses the canvas once with a brush a tenth of its height.
+  const line: Stroke = {
+    brush: { size: 0.1, softness: 0, mode: "set", value: 1 },
+    points: [0, 0.5, 1, 0.5],
+  };
+  const fits = Math.floor(RECIPE_LIMITS.drawingArea / strokeCost(line, ASPECT));
+
+  test("a stroke fits only within the recipe's drawing area", () => {
+    const layers: Layer[] = [
+      drawing(
+        "d",
+        Array.from({ length: fits - 1 }, () => line),
+      ),
+      drawing("e"),
+    ];
+    expect(strokeFits(layers, "e", line, ASPECT)).toBe(true);
+    const full = addStroke(layers, "e", line);
+    expect(strokeFits(full, "e", line, ASPECT)).toBe(false);
+    expect(strokeFits(full, "e", strokeOf(1), ASPECT)).toBe(true);
+    expect(strokeFits(layers, "e", strokeOf(RECIPE_LIMITS.pointsPerStroke + 1), ASPECT)).toBe(
+      false,
+    );
+  });
+
+  test("won't duplicate a drawing past the recipe's drawing area", () => {
+    const half = Math.floor(fits / 2);
+    const layers: Layer[] = [
+      drawing(
+        "d",
+        Array.from({ length: half }, () => line),
+      ),
+      drawing("e", [line, line]),
+    ];
+    expect(duplicateProblem(layers, "d", ASPECT)).toBe(
+      2 * half + 2 > fits ? "drawingArea" : undefined,
+    );
+    const over: Layer[] = [
+      drawing(
+        "d",
+        Array.from({ length: half + 1 }, () => line),
+      ),
+      layer("a"),
+    ];
+    expect(duplicateProblem(over, "d", ASPECT)).toBe("drawingArea");
+    expect(duplicateLayer(over, "d", ASPECT)).toBe(over);
+    expect(duplicateProblem(over, "a", ASPECT)).toBeUndefined();
   });
 });

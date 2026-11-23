@@ -1,8 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { canReplaceAsset, canReplaceTile, newAssetId, newTileId } from "../../core/assets.ts";
+import { strokeCost } from "../../core/depth/drawing.ts";
 import { parseRecipe, RECIPE_LIMITS } from "../../core/parseRecipe.ts";
 import { createRandom, type Random } from "../../core/random.ts";
-import { defaultRecipe, type Asset, type Layer, type Recipe } from "../../core/recipe.ts";
+import { defaultRecipe, type Asset, type Recipe } from "../../core/recipe.ts";
 import { Editor } from "../../state/editor.ts";
 import {
   addStroke,
@@ -14,6 +15,7 @@ import {
   insertLayer,
   moveLayer,
   removeLayer,
+  strokeFits,
   strokeRoom,
   withFreeIdentity,
 } from "../../state/layers.ts";
@@ -42,23 +44,35 @@ const ACTIONS: ((editor: Editor, random: Random) => void)[] = [
     }
   },
   (editor, random) => {
-    const { layers } = editor.recipe.value;
+    const { layers, aspect } = editor.recipe.value;
     const layer = pick(random, layers);
-    if (layer !== undefined && canDuplicateLayer(layers, layer.id)) {
-      editor.updateLayers((current) => duplicateLayer(current, layer.id));
+    if (layer !== undefined && canDuplicateLayer(layers, layer.id, aspect)) {
+      editor.updateLayers((current) => duplicateLayer(current, layer.id, aspect));
     }
   },
   (editor, random) => {
-    const { layers } = editor.recipe.value;
+    const { layers, aspect } = editor.recipe.value;
     const drawing = pick(
       random,
       layers.filter((layer) => layer.kind === "drawing"),
     );
     const room = drawing === undefined ? 0 : strokeRoom(layers, drawing.id);
-    if (drawing !== undefined && room > 0) {
-      const points = Array.from({ length: room * 2 }, () => random.float());
-      const brush = { size: 0.05, softness: 0, mode: "set", value: 1 } as const;
-      editor.updateLayers((current) => addStroke(current, drawing.id, { brush, points }));
+    // Mostly fine strokes in small steps, which run into the point limits, and now and
+    // then a broad sweep, which runs into the drawing area limit.
+    const broad = random.float() < 0.5;
+    const step = (value: number) =>
+      Math.min(1.5, Math.max(-0.5, value + (random.float() - 0.5) * (broad ? 1 : 0.002)));
+    let x = random.float();
+    let y = random.float();
+    const points = Array.from({ length: broad ? Math.min(room, 24) : room }, () => {
+      x = step(x);
+      y = step(y);
+      return [x, y];
+    }).flat();
+    const brush = { size: broad ? 0.75 : 0.002, softness: 0, mode: "set", value: 1 } as const;
+    const stroke = { brush, points };
+    if (drawing !== undefined && room > 0 && strokeFits(layers, drawing.id, stroke, aspect)) {
+      editor.updateLayers((current) => addStroke(current, drawing.id, stroke));
     }
   },
   (editor, random) => {
@@ -127,16 +141,17 @@ const ACTIONS: ((editor: Editor, random: Random) => void)[] = [
   },
 ];
 
-function totalPoints(layers: readonly Layer[]): number {
-  let total = 0;
-  for (const layer of layers) {
+function drawingTotals(recipe: Recipe): { points: number; area: number } {
+  const totals = { points: 0, area: 0 };
+  for (const layer of recipe.layers) {
     if (layer.kind === "drawing") {
       for (const stroke of layer.strokes) {
-        total += stroke.points.length / 2;
+        totals.points += stroke.points.length / 2;
+        totals.area += strokeCost(stroke, recipe.aspect);
       }
     }
   }
-  return total;
+  return totals;
 }
 
 /** A scene with one image layer fewer than the asset limit, each with its own image. */
@@ -158,16 +173,18 @@ describe("editor actions at the recipe's limits", () => {
   test.each([1, 2, 3])("keep every scene parseable (seed %i)", (seed) => {
     const random = createRandom(seed);
     const editor = new Editor(imagesShortOfTheLimit());
-    const reached = { layers: false, points: false, assets: false };
+    const reached = { layers: false, points: false, area: false, assets: false };
     for (let step = 0; step < 300; step++) {
       pick(random, ACTIONS)?.(editor, random);
       editor.endEdit();
       const recipe: Recipe = editor.recipe.value;
       expect(() => parseRecipe(recipe), `after step ${String(step)}`).not.toThrow();
       reached.layers ||= recipe.layers.length === RECIPE_LIMITS.layers;
-      reached.points ||= totalPoints(recipe.layers) > RECIPE_LIMITS.pointsTotal / 2;
+      const totals = drawingTotals(recipe);
+      reached.points ||= totals.points > RECIPE_LIMITS.pointsTotal / 2;
+      reached.area ||= totals.area > RECIPE_LIMITS.drawingArea / 2;
       reached.assets ||= Object.keys(recipe.assets).length === RECIPE_LIMITS.assets;
     }
-    expect(reached).toEqual({ layers: true, points: true, assets: true });
+    expect(reached).toEqual({ layers: true, points: true, area: true, assets: true });
   });
 });

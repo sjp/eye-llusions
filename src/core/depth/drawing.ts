@@ -328,6 +328,75 @@ function apply(
   }
 }
 
+/** Thinner brushes cost as much as this, in canvas heights: each row has a fixed cost. */
+const MIN_COST_WIDTH = 0.02;
+
+/** Cost of blurring a smoothing stroke's bounds, per pixel, relative to painting one. */
+const SMOOTH_COST = 6;
+
+/**
+ * An upper estimate of the work to rasterise `stroke` on a canvas `aspect` times wider
+ * than it is tall, in canvas areas: the pixels it visits as a fraction of the canvas, at
+ * any resolution. Strokes are measured in full, even where they leave the canvas.
+ */
+export function strokeCost(stroke: Stroke, aspect: number): number {
+  const { points, brush } = stroke;
+  // Lengths here are in canvas heights, so the canvas is `aspect` square heights.
+  const width = Math.max(brush.size, MIN_COST_WIDTH);
+  const radiusSquared = (width / 2) ** 2;
+  const count = points.length / 2;
+  const segments = Math.max(1, count - 1);
+  let area = 0;
+  let previousX = 0;
+  let previousY = 0;
+  let minX = points[0];
+  let maxX = points[0];
+  let minY = points[1];
+  let maxY = points[1];
+  // Mirrors the regions that `footprint` visits for each segment.
+  for (let s = 0; s < segments; s++) {
+    const next = Math.min(s + 1, count - 1);
+    const dx = (points[2 * next] - points[2 * s]) * aspect;
+    const dy = points[2 * next + 1] - points[2 * s + 1];
+    const last = s === segments - 1;
+    const repeated = dx === 0 && dy === 0;
+    minX = Math.min(minX, points[2 * next]);
+    maxX = Math.max(maxX, points[2 * next]);
+    minY = Math.min(minY, points[2 * next + 1]);
+    maxY = Math.max(maxY, points[2 * next + 1]);
+    if (repeated && s > 0 && !last) {
+      continue;
+    }
+    // The start disc: whole without either direction, half without one, and otherwise
+    // the wedge that the turn from the previous segment uncovers.
+    const unturned = previousX === 0 && previousY === 0;
+    if (unturned || repeated) {
+      area += ((unturned && repeated ? 2 : 1) * Math.PI * radiusSquared) / 2;
+    } else {
+      const turn = Math.atan2(
+        Math.abs(previousX * dy - previousY * dx),
+        previousX * dx + previousY * dy,
+      );
+      area += (turn / 2) * radiusSquared;
+    }
+    if (!repeated) {
+      area += width * Math.hypot(dx, dy);
+      if (last) {
+        area += (Math.PI * radiusSquared) / 2;
+      }
+      previousX = dx;
+      previousY = dy;
+    }
+  }
+  if (brush.mode === "smooth") {
+    const clamp = (value: number, max: number) => Math.min(max, Math.max(0, value));
+    const boxWidth = clamp(maxX * aspect + width, aspect) - clamp(minX * aspect - width, aspect);
+    const boxHeight = clamp(maxY + width, 1) - clamp(minY - width, 1);
+    area += SMOOTH_COST * boxWidth * boxHeight;
+  }
+  return area / aspect;
+}
+
 /**
  * Paints a drawing layer's strokes in order. `set` paints towards the brush value,
  * `raise` and `lower` add or remove it, clamped to 0..1, and `smooth` blurs what is

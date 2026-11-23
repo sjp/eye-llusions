@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { defaultRecipe, type Brush, type DrawingLayer, type Stroke } from "../recipe.ts";
 import { compositeDepth } from "./composite.ts";
-import { rasteriseDrawing } from "./drawing.ts";
+import { rasteriseDrawing, strokeCost } from "./drawing.ts";
 import type { LayerField } from "./raster.ts";
 
 const HARD: Brush = { size: 0.2, softness: 0, mode: "set", value: 1 };
@@ -132,5 +132,35 @@ describe("rasteriseDrawing", () => {
     const depth = await compositeDepth(recipe, 100, 100);
     expect(depth[50 * 100 + 50]).toBeCloseTo(0.5);
     expect(depth[0]).toBe(0);
+  });
+});
+
+describe("strokeCost", () => {
+  const square = (size: number) => Math.PI * (size / 2) ** 2;
+
+  test("a dot costs its disc as a fraction of the canvas", () => {
+    expect(strokeCost(stroke([0.5, 0.5], { size: 0.2 }), 2)).toBeCloseTo(square(0.2) / 2);
+  });
+
+  test("a line adds its length times the brush width, measured in canvas heights", () => {
+    const line = stroke([0, 0.5, 1, 0.5], { size: 0.2 });
+    expect(strokeCost(line, 2)).toBeCloseTo((0.2 * 2 + square(0.2)) / 2);
+  });
+
+  test("a joint adds the part of its disc that the turn uncovers", () => {
+    const straight = stroke([0, 0.5, 0.5, 0.5, 1, 0.5], { size: 0.2 });
+    const reversed = stroke([0, 0.5, 0.5, 0.5, 0, 0.5], { size: 0.2 });
+    expect(strokeCost(straight, 1)).toBeCloseTo(0.2 + square(0.2));
+    expect(strokeCost(reversed, 1)).toBeCloseTo(0.2 + 1.5 * square(0.2));
+  });
+
+  test("fine brushes still cost something per row", () => {
+    expect(strokeCost(stroke([0, 0, 1, 1], { size: 0.001 }), 1)).toBeGreaterThan(0.02);
+  });
+
+  test("smoothing adds the area it blurs", () => {
+    const line = stroke([0.25, 0.5, 0.75, 0.5], { size: 0.1 });
+    const smooth = stroke(line.points, { size: 0.1, mode: "smooth" });
+    expect(strokeCost(smooth, 1)).toBeGreaterThan(strokeCost(line, 1) + 0.5 * 0.2);
   });
 });

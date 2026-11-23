@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { RECIPE_LIMITS, RecipeError, parseRecipe } from "./parseRecipe.ts";
+import { strokeCost } from "./depth/drawing.ts";
 import { createRandom } from "./random.ts";
 import { scaleLimits } from "./texture/scale.ts";
 import { defaultRecipe, type Layer, type Recipe, type SampleLayer, type Stroke } from "./recipe.ts";
@@ -13,6 +14,12 @@ function stroke(points: number): Stroke {
     brush: { size: 0.05, softness: 0.5, mode: "raise", value: 0.25 },
     points: Array.from({ length: points * 2 }, (_, i) => (i % 7) / 7),
   };
+}
+
+/** A stroke with a fine brush and small steps, well within the drawing area limit. */
+function fineStroke(points: number): Stroke {
+  const { brush, points: coordinates } = stroke(points);
+  return { brush: { ...brush, size: 0.001 }, points: coordinates.map((x) => x / 100) };
 }
 
 function fullRecipe(): Recipe {
@@ -184,7 +191,7 @@ describe("parseRecipe accepts", () => {
       blend: "add",
       depth: 1,
       strokes: Array.from({ length: RECIPE_LIMITS.strokesPerLayer }, (_, i) =>
-        stroke(i === 0 ? RECIPE_LIMITS.pointsPerStroke : 1),
+        fineStroke(i === 0 ? RECIPE_LIMITS.pointsPerStroke : 1),
       ),
     };
     const recipe: Recipe = {
@@ -265,7 +272,7 @@ describe("parseRecipe rejects", () => {
 
   const layerCopies = (count: number) => Array.from({ length: count }, () => sphere);
   const strokes = (count: number, points: number) =>
-    Array.from({ length: count }, () => stroke(points));
+    Array.from({ length: count }, () => fineStroke(points));
 
   test.each<[string, string, unknown, string?]>([
     ["another version", "version", 2],
@@ -396,6 +403,31 @@ describe("parseRecipe rejects", () => {
   test("an over-long unknown key without echoing all of it", () => {
     const error = errorOf(withValue("k".repeat(100_000), 1));
     expect(error.message.length).toBeLessThan(200);
+  });
+
+  test("a zigzag stroke that would take too long to draw", () => {
+    const points = Array.from({ length: RECIPE_LIMITS.pointsPerStroke * 2 }, (_, i) =>
+      Math.floor(i / 2) % 2 === 0 ? -0.5 : 1.5,
+    );
+    const zigzag: Stroke = { brush: { size: 0.05, softness: 0, mode: "set", value: 1 }, points };
+    const error = errorOf(withValue("layers.3.strokes", [zigzag]));
+    expect(error.path).toBe("layers[3].strokes[0]");
+  });
+
+  test("strokes whose drawing area adds up past the limit", () => {
+    // Each crosses the canvas once with a brush a tenth of its height.
+    const line: Stroke = {
+      brush: { size: 0.1, softness: 0, mode: "set", value: 1 },
+      points: [0, 0.5, 1, 0.5],
+    };
+    const fits = Math.floor(RECIPE_LIMITS.drawingArea / strokeCost(line, fullRecipe().aspect));
+    const at = (count: number) =>
+      withValue(
+        "layers.3.strokes",
+        Array.from({ length: count }, () => line),
+      );
+    expect(() => parseRecipe(at(fits))).not.toThrow();
+    expect(errorOf(at(fits + 1)).path).toBe(`layers[3].strokes[${String(fits)}]`);
   });
 });
 

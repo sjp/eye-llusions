@@ -3,7 +3,7 @@ import { useEffect, useRef } from "preact/hooks";
 import type { Brush, Recipe, Stroke } from "../../core/recipe.ts";
 import { finishStroke } from "../../core/strokes.ts";
 import type { Editor } from "../../state/editor.ts";
-import { addStroke, strokeRoom } from "../../state/layers.ts";
+import { addStroke, strokeFits } from "../../state/layers.ts";
 import { gripOf, moveGrip, type Grip, type ViewTransform } from "./navigation.ts";
 import type { DrawingTools } from "./tools.ts";
 
@@ -160,7 +160,7 @@ export function DrawingSurface({ editor, layerId, strokes, tools, view, shown }:
       brush: { ...stroke.brush, size },
       points: finishStroke(stroke.points, recipe.aspect, size),
     };
-    const fits = finished.points.length / 2 <= strokeRoom(recipe.layers, layerId);
+    const fits = strokeFits(recipe.layers, layerId, finished, recipe.aspect);
     tools.full.value = !fits;
     if (fits) {
       editor.updateLayers((layers) => addStroke(layers, layerId, finished));

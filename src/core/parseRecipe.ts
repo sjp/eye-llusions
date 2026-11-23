@@ -16,6 +16,7 @@ import {
   type TextureGenerator,
   type TextureSpec,
 } from "./recipe.ts";
+import { strokeCost } from "./depth/drawing.ts";
 import { FIGURE_IDS } from "./depth/figure.ts";
 import { clampScale } from "./texture/scale.ts";
 
@@ -28,6 +29,8 @@ export const RECIPE_LIMITS = {
   strokesPerLayer: 1000,
   pointsPerStroke: 4000,
   pointsTotal: 50_000,
+  /** Drawing work across all strokes in canvas areas, as estimated by `strokeCost`. */
+  drawingArea: 64,
   assets: 16,
   assetSide: 2048,
   assetBytesTotal: 64 * 1024 * 1024,
@@ -261,7 +264,10 @@ function brush(value: unknown, path: string): Brush {
   };
 }
 
-function stroke(value: unknown, path: string, budget: { points: number }): Stroke {
+/** Running totals of the recipe's drawing, checked against its limits. */
+type Budget = { aspect: number; points: number; area: number };
+
+function stroke(value: unknown, path: string, budget: Budget): Stroke {
   const fields = object(value, path, ["brush", "points"]);
   const pointsPath = join(path, "points");
   const coordinates = array(fields.points, pointsPath, RECIPE_LIMITS.pointsPerStroke * 2);
@@ -275,15 +281,20 @@ function stroke(value: unknown, path: string, budget: { points: number }): Strok
       `more than ${String(RECIPE_LIMITS.pointsTotal)} points in the recipe`,
     );
   }
-  return {
+  const result = {
     brush: brush(fields.brush, join(path, "brush")),
     points: coordinates.map((coordinate, index) =>
       number(coordinate, `${pointsPath}[${String(index)}]`, ...POSITION_RANGE),
     ),
   };
+  budget.area += strokeCost(result, budget.aspect);
+  if (budget.area > RECIPE_LIMITS.drawingArea) {
+    throw new RecipeError(path, "the drawing has more strokes than the recipe can render");
+  }
+  return result;
 }
 
-function layer(value: unknown, path: string, budget: { points: number }): Layer {
+function layer(value: unknown, path: string, budget: Budget): Layer {
   const at = (key: string) => join(path, key);
   const kind = tag(value, path, "kind", ["sample", "text", "drawing", "image"]);
   const fields = object(value, path, [...COMMON_KEYS, ...KIND_KEYS[kind]]);
@@ -494,7 +505,8 @@ function recipe(value: unknown): Recipe {
     );
   }
   const seed = uint32(fields.seed, "seed");
-  const budget = { points: 0 };
+  const aspect = number(fields.aspect, "aspect", 0.2, 5);
+  const budget = { aspect, points: 0, area: 0 };
   const layers = array(fields.layers, "layers", RECIPE_LIMITS.layers).map((item, index) =>
     layer(item, `layers[${String(index)}]`, budget),
   );
@@ -508,7 +520,7 @@ function recipe(value: unknown): Recipe {
   const view = object(fields.view, "view", ["repeats", "depthOfField", "mode"]);
   return clampScale({
     version: RECIPE_VERSION,
-    aspect: number(fields.aspect, "aspect", 0.2, 5),
+    aspect,
     seed,
     layers,
     texture: texture(fields.texture, "texture"),

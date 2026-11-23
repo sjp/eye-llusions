@@ -1,3 +1,4 @@
+import { strokeCost } from "../core/depth/drawing.ts";
 import { RECIPE_LIMITS } from "../core/parseRecipe.ts";
 import type { Layer, Stroke } from "../core/recipe.ts";
 
@@ -76,25 +77,60 @@ function totalPoints(layers: readonly Layer[]): number {
 }
 
 /**
- * Whether a copy of the layer with ID `id` fits in the stack: there is room for another
- * layer, and the copy's drawn points stay within the recipe's total.
+ * Whether the drawing in `layers`, on a canvas `aspect` times wider than it is tall, is
+ * within the recipe's drawing area. Sums in the same order as the recipe parser, so
+ * both agree at the limit.
  */
-export function canDuplicateLayer(layers: readonly Layer[], id: string): boolean {
-  const original = layers.find((layer) => layer.id === id);
-  return (
-    original !== undefined &&
-    canAddLayer(layers) &&
-    totalPoints(layers) + layerPoints(original) <= RECIPE_LIMITS.pointsTotal
-  );
+function withinDrawingArea(layers: readonly Layer[], aspect: number): boolean {
+  let area = 0;
+  for (const layer of layers) {
+    if (layer.kind === "drawing") {
+      for (const stroke of layer.strokes) {
+        area += strokeCost(stroke, aspect);
+      }
+    }
+  }
+  return area <= RECIPE_LIMITS.drawingArea;
+}
+
+/** Why a copy of a layer wouldn't fit in the stack, if it wouldn't. */
+type DuplicateProblem = "layers" | "points" | "drawingArea";
+
+/**
+ * What would stop a copy of the layer with ID `id` fitting in the stack on a canvas
+ * `aspect` times wider than it is tall: no room for another layer, or too many drawn
+ * points or too much drawing area in all. Undefined when it fits.
+ */
+export function duplicateProblem(
+  layers: readonly Layer[],
+  id: string,
+  aspect: number,
+): DuplicateProblem | undefined {
+  const index = layers.findIndex((layer) => layer.id === id);
+  if (index === -1 || !canAddLayer(layers)) {
+    return "layers";
+  }
+  if (totalPoints(layers) + layerPoints(layers[index]) > RECIPE_LIMITS.pointsTotal) {
+    return "points";
+  }
+  if (!withinDrawingArea(layers.toSpliced(index + 1, 0, layers[index]), aspect)) {
+    return "drawingArea";
+  }
+  return undefined;
+}
+
+/** Whether a copy of the layer with ID `id` fits in the stack. */
+export function canDuplicateLayer(layers: readonly Layer[], id: string, aspect: number): boolean {
+  return duplicateProblem(layers, id, aspect) === undefined;
 }
 
 /**
  * A copy of the layer with ID `id`, with a fresh ID and name, inserted above it. Returns
  * `layers` unchanged when the copy wouldn't fit.
  */
-export function duplicateLayer(layers: Layer[], id: string): Layer[] {
+export function duplicateLayer(layers: Layer[], id: string, aspect: number): Layer[] {
   const original = layers.find((layer) => layer.id === id);
-  if (original === undefined || !canDuplicateLayer(layers, id)) {
+  if (original === undefined || !canDuplicateLayer(layers, id, aspect)) {
     return layers;
   }
   const copy: Layer = {
@@ -142,6 +178,17 @@ export function strokeRoom(layers: readonly Layer[], id: string): number {
   return strokes >= RECIPE_LIMITS.strokesPerLayer
     ? 0
     : Math.max(0, Math.min(RECIPE_LIMITS.pointsPerStroke, RECIPE_LIMITS.pointsTotal - points));
+}
+
+/**
+ * Whether `stroke` fits on drawing layer `id`, on a canvas `aspect` times wider than it
+ * is tall, within the recipe's caps on strokes, points and drawing area.
+ */
+export function strokeFits(layers: Layer[], id: string, stroke: Stroke, aspect: number): boolean {
+  return (
+    stroke.points.length / 2 <= strokeRoom(layers, id) &&
+    withinDrawingArea(addStroke(layers, id, stroke), aspect)
+  );
 }
 
 /** Adds `stroke` to the top of drawing layer `id`. */

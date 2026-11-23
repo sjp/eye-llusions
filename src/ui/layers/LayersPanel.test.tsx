@@ -176,6 +176,29 @@ describe("LayersPanel", () => {
     );
   });
 
+  test("won't duplicate a drawing whose copy has too much drawing area", () => {
+    // Broad sweeps that fill most of the drawing area, so a copy would pass it.
+    const sweep = {
+      brush: { size: 0.75, softness: 0, mode: "set" as const, value: 1 },
+      points: [0, 0, 1, 1, 0, 1],
+    };
+    const drawing: Layer = {
+      kind: "drawing",
+      id: "drawing-1",
+      name: "Drawing",
+      visible: true,
+      blend: "max",
+      depth: 1,
+      strokes: Array.from({ length: 20 }, () => sweep),
+    };
+    setup([drawing]);
+    const duplicate = screen.getByRole<HTMLButtonElement>("button", { name: "Duplicate" });
+    expect(duplicate.disabled).toBe(true);
+    expect(duplicate.getAttribute("aria-describedby")).toBe(
+      screen.getByText(/how much drawing a picture can hold/).id,
+    );
+  });
+
   test("an empty stack offers only adding", () => {
     const editor = setup([]);
     expect(screen.queryByRole("list")).toBeNull();
