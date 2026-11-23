@@ -1,3 +1,4 @@
+import { migrateRecipe } from "../core/migrateRecipe.ts";
 import { parseRecipe } from "../core/parseRecipe.ts";
 import type { Layer, Recipe, Stroke } from "../core/recipe.ts";
 import { STROKE_GRID } from "../core/strokes.ts";
@@ -117,7 +118,7 @@ export async function decodeRecipe(payload: string): Promise<Recipe> {
     throw new ShareLinkError(BROKEN);
   }
   try {
-    return parseRecipe(input);
+    return parseRecipe(migrateRecipe(input));
   } catch {
     throw new ShareLinkError(
       "This link doesn't describe a scene Eye-llusion can show, so it couldn't be opened.",

@@ -1,6 +1,7 @@
 import { referencedAssets } from "../core/assets.ts";
 import { insertChunk, readChunks } from "../core/png/chunks.ts";
 import { decodeITxt, encodeITxt } from "../core/png/itxt.ts";
+import { migrateRecipe } from "../core/migrateRecipe.ts";
 import { parseRecipe, RECIPE_LIMITS } from "../core/parseRecipe.ts";
 import type { Asset, Recipe } from "../core/recipe.ts";
 import { compress, decompress, fromBase64Url, toBase64Url } from "./bytes.ts";
@@ -192,13 +193,13 @@ export async function readProject(bytes: Uint8Array): Promise<Recipe> {
   // assets it uses are inflated.
   let parsed: Recipe;
   try {
-    parsed = parseRecipe(recipe);
+    parsed = parseRecipe(migrateRecipe(recipe));
   } catch {
     throw new ProjectFileError("invalid");
   }
   const assets = await decodeAssets(project.assets, new Set(referencedAssets(parsed)));
   try {
-    return parseRecipe({ ...recipe, assets });
+    return parseRecipe({ ...parsed, assets });
   } catch {
     throw new ProjectFileError("invalid");
   }
