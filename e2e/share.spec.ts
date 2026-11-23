@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
-import { layerNames, openLayers, settledPixels } from "./preview.ts";
+import { expect, test, type Locator, type Page } from "@playwright/test";
+import { layerNames, openLayers, settledPixels, toolbarAction } from "./preview.ts";
 
 test("a copied link opens the same scene in a new page", async ({ page, context, browserName }) => {
   if (browserName === "chromium") {
@@ -24,7 +24,7 @@ test("a copied link opens the same scene in a new page", async ({ page, context,
   await expect(page.getByRole("radio", { name: "Depth" })).toBeChecked();
   const depth = await settledPixels(canvas, 0);
 
-  await page.getByRole("button", { name: "Share" }).click();
+  await toolbarAction(page, "Share");
   const dialog = page.getByRole("dialog", { name: "Share" });
   const link = await dialog.getByRole("textbox", { name: "Link" }).inputValue();
   expect(link).toMatch(/#r=1\.[\w-]+$/);
@@ -63,13 +63,67 @@ test("a damaged link shows an error and opens the default scene", async ({ page 
   expect(errors).toEqual([]);
 });
 
-test("the toolbar fits the screen with all its buttons", async ({ page }) => {
-  await openLayers(page);
-  for (const name of ["Gallery", "Open", "Save", "Share", "View", "Undo", "Redo"]) {
-    await expect(page.getByRole("button", { name, exact: true })).toBeInViewport({ ratio: 1 });
+/** Checks the control is wholly on screen, inside the toolbar's side padding, and on top. */
+async function reachable(page: Page, control: Locator) {
+  await expect(control).toBeInViewport({ ratio: 1 });
+  const box = await control.boundingBox();
+  const width = page.viewportSize()?.width ?? 0;
+  expect(box).not.toBeNull();
+  if (box === null) {
+    return;
   }
-  const overflow = await page
-    .locator(".toolbar")
-    .evaluate((toolbar) => toolbar.scrollWidth - toolbar.clientWidth);
-  expect(overflow).toBeLessThanOrEqual(0);
-});
+  expect(box.x).toBeGreaterThanOrEqual(12);
+  expect(box.x + box.width).toBeLessThanOrEqual(width - 12);
+  expect(box.width).toBeGreaterThanOrEqual(44);
+  expect(box.height).toBeGreaterThanOrEqual(44);
+  const hit = await control.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const top = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+    return top !== null && element.contains(top);
+  });
+  expect(hit).toBe(true);
+}
+
+for (const width of [undefined, 375, 360, 320]) {
+  test(`every toolbar action is reachable ${width === undefined ? "at the device's width" : `at ${String(width)} px`}`, async ({
+    page,
+  }) => {
+    if (width !== undefined) {
+      await page.setViewportSize({ width, height: Math.round(width * 2) });
+    }
+    const { violations, errors } = await openLayers(page);
+    await page.getByRole("button", { name: "New seed" }).click();
+    await page.getByRole("button", { name: "Undo" }).click();
+    const toolbar = page.locator(".toolbar");
+    for (const name of ["Gallery", "View", "Undo", "Redo"]) {
+      await reachable(page, toolbar.getByRole("button", { name, exact: true }));
+    }
+    const overflow = await toolbar.evaluate((element) => element.scrollWidth - element.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+
+    const more = toolbar.getByRole("button", { name: "More" });
+    if ((page.viewportSize()?.width ?? 0) < 410) {
+      await reachable(page, more);
+      await more.click();
+      for (const name of ["Open", "Save", "Share"]) {
+        const item = page.getByRole("menuitem", { name });
+        await expect(item).toBeInViewport({ ratio: 1 });
+        expect((await item.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+      }
+      await page.getByRole("menuitem", { name: "Share" }).click();
+    } else {
+      await expect(more).toHaveCount(0);
+      for (const name of ["Open", "Save", "Share"]) {
+        await reachable(page, toolbar.getByRole("button", { name, exact: true }));
+      }
+      await toolbar.getByRole("button", { name: "Share" }).click();
+    }
+    const dialog = page.getByRole("dialog", { name: "Share" });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Close" }).click();
+    await page.getByRole("button", { name: "Redo" }).click();
+    await expect(page.getByRole("button", { name: "Redo" })).toBeDisabled();
+    expect(violations).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+}

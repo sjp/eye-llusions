@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { watchPage } from "./guard.ts";
-import { layerNames, openLayers, settledPixels } from "./preview.ts";
+import { layerNames, openLayers, settledPixels, toolbarAction } from "./preview.ts";
 
 /** The share of pixels brighter than black, and the number of distinct colours. */
 function inked(canvas: Locator) {
@@ -71,7 +71,7 @@ test("a remixed and edited sample survives a share link, figure included", async
   expect(star).not.toBe(heart);
   expect((await inked(canvas)).bright).toBeGreaterThan(0.1);
 
-  await page.getByRole("button", { name: "Share" }).click();
+  await toolbarAction(page, "Share");
   const dialog = page.getByRole("dialog", { name: "Share" });
   const link = await dialog.getByRole("textbox", { name: "Link" }).inputValue();
   await dialog.getByRole("button", { name: "Close" }).click();

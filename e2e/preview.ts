@@ -63,3 +63,14 @@ export async function settledPixels(canvas: Locator, after: number): Promise<num
 export async function renders(canvas: Locator): Promise<number> {
   return Number(await canvas.getAttribute("data-renders"));
 }
+
+/** Runs a toolbar action, through the More menu on screens too narrow to show it directly. */
+export async function toolbarAction(page: Page, name: "Open" | "Save" | "Share") {
+  const more = page.getByRole("button", { name: "More" });
+  if (await more.isVisible()) {
+    await more.click();
+    await page.getByRole("menuitem", { name }).click();
+  } else {
+    await page.getByRole("button", { name, exact: true }).click();
+  }
+}

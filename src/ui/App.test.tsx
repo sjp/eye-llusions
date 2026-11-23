@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/preact";
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, onTestFinished, test, vi } from "vitest";
 import { Editor } from "../state/editor.ts";
 import { App } from "./App.tsx";
 import type { Renderer } from "./Preview.tsx";
@@ -113,5 +113,31 @@ describe("App", () => {
       expect(screen.queryByRole("dialog", { name: "Viewer" })).toBeNull();
     });
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "View" }));
+  });
+
+  test("narrow screens move Open, Save and Share into a menu", () => {
+    vi.spyOn(window, "matchMedia").mockImplementation(
+      (query) =>
+        ({
+          matches: query.includes("max-width"),
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    );
+    onTestFinished(() => {
+      vi.restoreAllMocks();
+    });
+    setup();
+    for (const name of ["Open", "Save", "Share"]) {
+      expect(screen.queryByRole("button", { name })).toBeNull();
+    }
+    const more = screen.getByRole("button", { name: "More" });
+    fireEvent.click(more);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Save" }));
+    expect(screen.getByRole("dialog", { name: "Save PNG" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog", { name: "Save PNG" })).toBeNull();
+    expect(document.activeElement).toBe(more);
   });
 });

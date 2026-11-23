@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
-import { layerNames, openLayers, renders, settledPixels } from "./preview.ts";
+import { layerNames, openLayers, renders, settledPixels, toolbarAction } from "./preview.ts";
 
 const CONE = new URL("fixtures/cone.png", import.meta.url);
 const HALF_SKY = new URL("fixtures/half-sky.png", import.meta.url);
@@ -28,7 +28,7 @@ test("a saved PNG reopens the same project with its images", async ({ page, cont
   await page.getByLabel("Tile image").setInputFiles(HALF_SKY.pathname);
   await expect(page.getByRole("button", { name: "Replace tile" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Save" }).click();
+  await toolbarAction(page, "Save");
   const dialog = page.getByRole("dialog", { name: "Save PNG" });
   await expect(dialog.getByText(/Some apps remove the project/)).toBeVisible();
   await dialog.getByRole("radio", { name: "Custom" }).check();

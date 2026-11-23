@@ -16,9 +16,11 @@ import { NoticeBar, type Notice } from "./Notice.tsx";
 import { SaveDialog } from "./SaveDialog.tsx";
 import { ShareDialog } from "./ShareDialog.tsx";
 import { Stage } from "./Stage.tsx";
+import { ToolbarMenu } from "./ToolbarMenu.tsx";
 import { useProjectFiles } from "./useProjectFiles.ts";
 import { useRenderer } from "./useRenderer.ts";
 import { useCreateEntry } from "./useCreateEntry.ts";
+import { useMediaQuery } from "./useMediaQuery.ts";
 import { useShareLink } from "./useShareLink.ts";
 import { useUndoShortcuts } from "./useUndoShortcuts.ts";
 import { useUnloadWarning } from "./useUnloadWarning.ts";
@@ -42,6 +44,9 @@ type Dialog = "share" | "save" | "leave" | undefined;
 
 type Screen = "gallery" | "create";
 
+/** Below this width the file actions move into a menu so the toolbar fits. */
+const COMPACT_TOOLBAR = "(max-width: 409px)";
+
 function hasFiles(event: DragEvent): boolean {
   return event.dataTransfer?.types.includes("Files") ?? false;
 }
@@ -63,6 +68,8 @@ export function App({
   const viewButton = useRef<HTMLButtonElement>(null);
   const shareButton = useRef<HTMLButtonElement>(null);
   const saveButton = useRef<HTMLButtonElement>(null);
+  const moreButton = useRef<HTMLButtonElement>(null);
+  const compact = useMediaQuery(COMPACT_TOOLBAR);
   const fileInput = useRef<HTMLInputElement>(null);
   const [dialog, setDialog] = useState<Dialog>(undefined);
   const [notice, setNotice] = useState<Notice | undefined>(undefined);
@@ -140,6 +147,21 @@ export function App({
     toGallery();
   };
 
+  const openPicker = (): void => {
+    fileInput.current?.click();
+  };
+  const openSave = (): void => {
+    setDialog("save");
+  };
+  const openShare = (): void => {
+    setDialog("share");
+  };
+  const fileActions = [
+    { label: "Open", onSelect: openPicker },
+    { label: "Save", dialog: true, onSelect: openSave },
+    { label: "Share", dialog: true, onSelect: openShare },
+  ];
+
   return (
     <DrawingToolsContext.Provider value={tools}>
       <div
@@ -182,15 +204,6 @@ export function App({
                 <rect x="13" y="13" width="7" height="7" rx="1" />
               </svg>
             </button>
-            <button
-              type="button"
-              class="button"
-              onClick={() => {
-                fileInput.current?.click();
-              }}
-            >
-              Open
-            </button>
             <input
               ref={fileInput}
               type="file"
@@ -206,28 +219,31 @@ export function App({
                 }
               }}
             />
-            <button
-              ref={saveButton}
-              type="button"
-              class="button"
-              aria-haspopup="dialog"
-              onClick={() => {
-                setDialog("save");
-              }}
-            >
-              Save
-            </button>
-            <button
-              ref={shareButton}
-              type="button"
-              class="button"
-              aria-haspopup="dialog"
-              onClick={() => {
-                setDialog("share");
-              }}
-            >
-              Share
-            </button>
+            {!compact && (
+              <>
+                <button type="button" class="button" onClick={openPicker}>
+                  Open
+                </button>
+                <button
+                  ref={saveButton}
+                  type="button"
+                  class="button"
+                  aria-haspopup="dialog"
+                  onClick={openSave}
+                >
+                  Save
+                </button>
+                <button
+                  ref={shareButton}
+                  type="button"
+                  class="button"
+                  aria-haspopup="dialog"
+                  onClick={openShare}
+                >
+                  Share
+                </button>
+              </>
+            )}
             <button ref={viewButton} type="button" class="button" onClick={enter}>
               View
             </button>
@@ -253,6 +269,7 @@ export function App({
             >
               Redo
             </button>
+            {compact && <ToolbarMenu label="More" items={fileActions} buttonRef={moreButton} />}
           </div>
           {notice !== undefined && (
             <NoticeBar
@@ -274,7 +291,7 @@ export function App({
             recipe={editor.recipe.value}
             onClose={() => {
               setDialog(undefined);
-              shareButton.current?.focus();
+              (shareButton.current ?? moreButton.current)?.focus();
             }}
             onDownloadPng={() => {
               setDialog("save");
@@ -293,7 +310,7 @@ export function App({
             }}
             onClose={() => {
               setDialog(undefined);
-              saveButton.current?.focus();
+              (saveButton.current ?? moreButton.current)?.focus();
             }}
           />
         )}
