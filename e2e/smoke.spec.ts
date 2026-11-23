@@ -17,3 +17,26 @@ test("the page limits workers and fonts to its own origin and sends no referrer"
   );
   await expect(page.locator('meta[name="referrer"]')).toHaveAttribute("content", "no-referrer");
 });
+
+test.describe("Trusted Types", () => {
+  // Browsers log the blocked assignment as an error.
+  test.use({ consoleErrors: "allow" });
+
+  test("keep HTML strings out of the page", async ({ page, guard }) => {
+    await page.goto("./");
+    const thrown = await page.evaluate(() => {
+      try {
+        document.body.insertAdjacentHTML("beforeend", "<b>injected</b>");
+        return "nothing";
+      } catch (error) {
+        return error instanceof Error ? error.name : String(error);
+      }
+    });
+    expect(thrown).toBe("TypeError");
+    await expect
+      .poll(() => guard.violations)
+      .toEqual([expect.stringMatching(/^require-trusted-types-for/)]);
+    // The violation was the point of the test.
+    guard.violations.length = 0;
+  });
+});

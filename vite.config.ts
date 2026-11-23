@@ -13,6 +13,9 @@ import { linkPreview } from "./config/linkPreview.ts";
  * govern. script-src also covers the render worker, so it must be a same-origin file.
  * style-src needs no 'unsafe-inline': the UI's inline styles (such as the preview's
  * size) are set through the DOM's style object, which the policy doesn't restrict.
+ * Trusted Types block HTML and script strings from reaching the DOM; the only policy,
+ * created first thing in src/trustedTypes.ts, passes same-origin script addresses so the
+ * workers can start.
  */
 const CSP = [
   "default-src 'self'",
@@ -24,6 +27,8 @@ const CSP = [
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'none'",
+  "require-trusted-types-for 'script'",
+  "trusted-types default",
 ].join("; ");
 
 /**
