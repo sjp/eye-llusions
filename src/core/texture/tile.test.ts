@@ -57,6 +57,11 @@ describe("fitTile", () => {
     ]);
   });
 
+  test("composites transparent pixels over black", () => {
+    const faded = rgba(3, 1, (x) => [255, 200, 100, [0, 128, 255][x]]);
+    expect([...fitTile(faded, 3).colours]).toEqual([0x000000ff, 0x806432ff, 0xffc864ff]);
+  });
+
   test("makes only the rows asked for", () => {
     const tall = gray(1, 2048, (_, y) => y % 256);
     const fitted = fitTile(tall, 500, 40);

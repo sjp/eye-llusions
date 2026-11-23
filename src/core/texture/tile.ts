@@ -34,6 +34,7 @@ function areaWeights(
 
 /**
  * Resamples `asset` to `width` pixels wide, keeping its aspect, by area averaging.
+ * Transparent pixels are composited over black first, as depth images are.
  * Only the first `maxHeight` rows are made, since rows beyond the image are never seen.
  */
 export function fitTile(asset: Asset, width: number, maxHeight = Infinity): FittedTile {
@@ -60,9 +61,10 @@ export function fitTile(asset: Asset, width: number, maxHeight = Infinity): Fitt
           g += data[at] * w;
           b += data[at] * w;
         } else {
-          r += data[at] * w;
-          g += data[at + 1] * w;
-          b += data[at + 2] * w;
+          const opaque = (data[at + 3] / 255) * w;
+          r += data[at] * opaque;
+          g += data[at + 1] * opaque;
+          b += data[at + 2] * opaque;
         }
       }
       const o = (y * width + x) * 3;
