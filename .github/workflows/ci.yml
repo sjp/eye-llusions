@@ -44,10 +44,10 @@ jobs:
       - name: Performance tests (non-blocking)
         continue-on-error: true
         run: npm run test:perf -- --reporter=verbose --reporter=github-actions
-      # Absolute addresses for link previews; they're left out of the page when unset.
+      # Absolute addresses for link previews.
       - run: npm run build
         env:
-          SITE_URL: ${{ vars.SITE_URL }}
+          SITE_URL: https://sjp.github.io/eye-llusions/
       - name: Get Playwright version
         id: playwright-version
         run: echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
