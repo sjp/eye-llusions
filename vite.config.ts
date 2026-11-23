@@ -80,5 +80,17 @@ export default defineConfig({
     environment: "happy-dom",
     setupFiles: ["src/test/setup.ts"],
     fakeTimers: { now: TEST_TIME },
+    // `npm run test:coverage` fails if the pure core or the state layer loses coverage. It
+    // runs with a longer timeout, as instrumentation slows the heaviest tests several times.
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["**/*.test.{ts,tsx}", "src/test/**"],
+      reporter: ["text-summary", "html"],
+      thresholds: {
+        "src/core/**": { statements: 97, branches: 90, functions: 95, lines: 97 },
+        "src/state/**": { statements: 95, branches: 90, functions: 95, lines: 95 },
+      },
+    },
   },
 });

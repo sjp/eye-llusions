@@ -11,6 +11,7 @@
     "fmt": "oxfmt",
     "figures": "node scripts/generate-figures.mjs",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage --testTimeout=30000",
     "test:perf": "vitest run --config vitest.perf.config.ts",
     "test:browser": "playwright test"
   },
@@ -25,6 +26,7 @@
     "@testing-library/dom": "^10.4.2",
     "@testing-library/preact": "^3.2.6",
     "@types/node": "^26.6.6",
+    "@vitest/coverage-v8": "^5.1.0",
     "happy-dom": "^21.0.4",
     "oxfmt": "^0.78.0",
     "oxlint": "^1.93.0",

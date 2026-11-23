@@ -34,7 +34,7 @@ jobs:
           npm run figures
           git diff --exit-code src/assets/figures
           test -z "$(git status --porcelain src/assets/figures)"
-      - run: npm test
+      - run: npm run test:coverage
       # Wall-clock budgets tuned on a developer machine; shared runners can be slower.
       - name: Performance tests (non-blocking)
         continue-on-error: true
