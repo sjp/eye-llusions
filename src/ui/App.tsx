@@ -18,6 +18,7 @@ import { ShareDialog } from "./ShareDialog.tsx";
 import { Stage } from "./Stage.tsx";
 import { useProjectFiles } from "./useProjectFiles.ts";
 import { useRenderer } from "./useRenderer.ts";
+import { useCreateEntry } from "./useCreateEntry.ts";
 import { useShareLink } from "./useShareLink.ts";
 import { useUndoShortcuts } from "./useUndoShortcuts.ts";
 import { useUnloadWarning } from "./useUnloadWarning.ts";
@@ -73,6 +74,22 @@ export function App({
   }, []);
   const clearLink = useShareLink(editor, setNotice, showCreate);
   const openFile = useProjectFiles(editor, selection, setNotice);
+  const toGallery = useCallback(() => {
+    clearLink();
+    setDialog(undefined);
+    setNotice(undefined);
+    setScreen("gallery");
+  }, [clearLink]);
+  const createEntry = useCreateEntry(
+    useCallback(() => {
+      if (editor.modified.peek()) {
+        setDialog("leave");
+        return true;
+      }
+      toGallery();
+      return false;
+    }, [editor, toGallery]),
+  );
   const wasViewing = useRef(false);
   useUndoShortcuts(editor);
   useUnloadWarning(screen === "create" && editor.modified.value);
@@ -106,10 +123,12 @@ export function App({
         }}
         onRemix={(sample: GallerySample) => {
           start(sample.recipe);
+          createEntry.enter();
           setScreen("create");
         }}
         onBlank={() => {
           start();
+          createEntry.enter();
           setScreen("create");
         }}
       />
@@ -117,10 +136,8 @@ export function App({
   }
 
   const leave = (): void => {
-    clearLink();
-    setDialog(undefined);
-    setNotice(undefined);
-    setScreen("gallery");
+    createEntry.leave();
+    toGallery();
   };
 
   return (

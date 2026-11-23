@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 
 /** The history state of the entry pushed on entering view mode. */
-const VIEW_ENTRY = "eye-llusion:view";
+export const VIEW_ENTRY = "eye-llusion:view";
 
 function ignore(): void {}
 

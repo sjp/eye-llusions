@@ -110,6 +110,37 @@ test("going back to the gallery asks before dropping changes", async ({ page }) 
   expect(errors).toEqual([]);
 });
 
+test("Back from Create returns to the gallery, asking first when the scene changed", async ({
+  page,
+}) => {
+  const { violations, errors } = await openGallery(page);
+  const blank = page.getByRole("button", { name: "Start from blank" });
+  await remix(page, "Hello");
+  await page.goBack();
+  await expect(blank).toBeVisible();
+
+  await remix(page, "Hello");
+  await page.getByRole("button", { name: "New seed" }).click();
+  await page.getByRole("button", { name: "View" }).click();
+  const viewer = page.getByRole("dialog", { name: "Viewer" });
+  await expect(viewer).toBeVisible();
+  await page.goBack();
+  await expect(viewer).toBeHidden();
+  await expect(page.getByRole("button", { name: "Undo" })).toBeEnabled();
+
+  await page.goBack();
+  const dialog = page.getByRole("dialog", { name: "Leave this scene?" });
+  await dialog.getByRole("button", { name: "Keep editing" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("button", { name: "Undo" })).toBeEnabled();
+
+  await page.goBack();
+  await dialog.getByRole("button", { name: "Go to gallery" }).click();
+  await expect(blank).toBeVisible();
+  expect(violations).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
 test("viewing a sample opens the viewer and leads back to the gallery", async ({ page }) => {
   const { violations, errors } = await openGallery(page);
   await page.getByRole("button", { name: "View Cat nap" }).click();
