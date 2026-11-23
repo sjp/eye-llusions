@@ -49,6 +49,17 @@ test("Create, its fully open controls and its dialogs fit a 360 px screen", asyn
   }
 });
 
+test("the viewer's controls for moving between samples fit a 360 px screen", async ({ page }) => {
+  await page.goto("./");
+  await page.getByRole("button", { name: "View Heart" }).click();
+  const viewer = page.getByRole("dialog", { name: "Viewer" });
+  await expect(viewer.locator(".preview-canvas")).toHaveAttribute("data-quality", "full");
+  for (const name of ["Previous sample", "Next sample", "Exit", "How to view"]) {
+    await expect(viewer.getByRole("button", { name, exact: true })).toBeInViewport({ ratio: 1 });
+  }
+  await expectNoSideways(page);
+});
+
 test("the viewer's controls fit a 360 px screen", async ({ page }) => {
   await openLayers(page);
   await page.getByRole("button", { name: "View" }).click();

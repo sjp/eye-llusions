@@ -148,6 +148,59 @@ test("tapping a thumbnail views its sample", async ({ page }) => {
   await expect(page.getByRole("button", { name: "View Heart" })).toBeFocused();
 });
 
+test("the viewer moves between samples with its buttons, arrow keys and swipes", async ({
+  page,
+}) => {
+  await openGallery(page);
+  await page.getByRole("button", { name: "View Heart" }).click();
+  const viewer = page.getByRole("dialog", { name: "Viewer" });
+  const title = viewer.locator(".viewer-title");
+  const canvas = viewer.locator(".preview-canvas");
+  await expect(title).toHaveText("Heart");
+  await expect(canvas).toHaveAttribute("data-quality", "full");
+  await page.getByRole("button", { name: "Got it" }).click();
+  await viewer.getByRole("button", { name: "Next sample" }).click();
+  await expect(title).toHaveText("Hello");
+  await viewer.getByRole("button", { name: "Previous sample" }).click();
+  await viewer.getByRole("button", { name: "Previous sample" }).click();
+  await expect(title).toHaveText("Spiral stairs");
+  await page.keyboard.press("ArrowRight");
+  await expect(title).toHaveText("Heart");
+  await page.keyboard.press("ArrowRight");
+  await expect(title).toHaveText("Hello");
+  await page.keyboard.press("ArrowLeft");
+  await expect(title).toHaveText("Heart");
+
+  // A finger swiping from right to left shows the next sample.
+  await viewer.locator(".viewer-area").evaluate((area) => {
+    const bounds = area.getBoundingClientRect();
+    const y = bounds.y + bounds.height / 2;
+    const points: [string, number][] = [
+      ["pointerdown", bounds.x + bounds.width * 0.7],
+      ["pointermove", bounds.x + bounds.width * 0.5],
+      ["pointerup", bounds.x + bounds.width * 0.3],
+    ];
+    for (const [type, x] of points) {
+      area.dispatchEvent(
+        new PointerEvent(type, {
+          pointerId: 9,
+          pointerType: "touch",
+          isPrimary: true,
+          clientX: x,
+          clientY: y,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    }
+  });
+  await expect(title).toHaveText("Hello");
+  await expect(canvas).toHaveAttribute("data-quality", "full");
+
+  await viewer.getByRole("button", { name: "Exit" }).click();
+  await expect(page.getByRole("button", { name: "View Hello" })).toBeFocused();
+});
+
 test("a file dropped on the gallery opens in Create", async ({ page, isMobile }) => {
   test.skip(isMobile, "Dragging files is a desktop gesture");
   await openGallery(page);

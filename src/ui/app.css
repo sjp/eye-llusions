@@ -426,6 +426,17 @@ h2 {
   gap: 8px;
 }
 
+.viewer-browse {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.viewer-title {
+  min-width: 6em;
+  text-align: center;
+}
+
 .viewer-presets,
 .viewer-zoom {
   display: flex;
@@ -454,6 +465,11 @@ h2 {
   display: flex;
   min-height: 0;
   overflow: hidden;
+}
+
+/* Sideways swipes move between samples instead of panning the page. */
+.viewer-area[data-swipe="true"] {
+  touch-action: pinch-zoom;
 }
 
 .viewer-area[data-zoomed="true"] {

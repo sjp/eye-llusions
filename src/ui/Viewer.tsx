@@ -34,7 +34,14 @@ type Props = {
   fullscreen?: boolean;
   /** Toggles full screen; left out where the browser can't go full screen. */
   onFullscreen?: (() => void) | undefined;
+  /** Moves between samples, when the viewer was opened from the gallery. */
+  browse?: Browse | undefined;
 };
+
+type Browse = { title: string; onPrevious: () => void; onNext: () => void };
+
+/** A swipe at least this long, in CSS pixels, and mostly sideways, moves between samples. */
+const SWIPE = 50;
 
 type Size = { width: number; height: number };
 
@@ -222,6 +229,7 @@ export function Viewer({
   onHelp,
   fullscreen = false,
   onFullscreen,
+  browse: browseAll,
 }: Props) {
   const areaRef = useRef<HTMLDivElement>(null);
   const exitRef = useRef<HTMLButtonElement>(null);
@@ -266,6 +274,40 @@ export function Viewer({
   };
 
   const practising = practice !== undefined;
+  // Moving between samples would drop the practice image, and arrows and swipes scroll
+  // a zoomed-in picture.
+  const browse = practising ? undefined : browseAll;
+  const swipeable = browse !== undefined && zoom <= 1;
+  const swipe = useRef<{ id: number; x: number; y: number } | undefined>(undefined);
+
+  // Effects can lag a render behind, so keys act on the sample shown now.
+  const latestBrowse = useRef(browse);
+  latestBrowse.current = browse;
+  useEffect(() => {
+    if (!swipeable) {
+      return undefined;
+    }
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) {
+        return;
+      }
+      const current = latestBrowse.current;
+      if (current === undefined) {
+        return;
+      }
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        current.onPrevious();
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        current.onNext();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [swipeable]);
   const wasPractising = useRef(practising);
   useEffect(() => {
     if (practising !== wasPractising.current) {
@@ -304,6 +346,33 @@ export function Viewer({
             End practice
           </button>
         ) : null}
+        {browse === undefined ? null : (
+          <div class="viewer-browse" role="group" aria-label="Samples">
+            <button
+              type="button"
+              class="button"
+              aria-label="Previous sample"
+              title="Previous sample"
+              aria-keyshortcuts="ArrowLeft"
+              onClick={browse.onPrevious}
+            >
+              ‹
+            </button>
+            <span class="viewer-title" aria-live="polite">
+              {browse.title}
+            </span>
+            <button
+              type="button"
+              class="button"
+              aria-label="Next sample"
+              title="Next sample"
+              aria-keyshortcuts="ArrowRight"
+              onClick={browse.onNext}
+            >
+              ›
+            </button>
+          </div>
+        )}
         <PeekButton peeking={peeking} onPeek={setPeeking} />
         <div class="viewer-presets" role="group" aria-label="Size the pattern for">
           <button
@@ -383,7 +452,32 @@ export function Viewer({
         </button>
       </div>
       <div class="viewer-stage">
-        <div class="viewer-area" ref={areaRef} data-zoomed={zoom > 1}>
+        <div
+          class="viewer-area"
+          ref={areaRef}
+          data-zoomed={zoom > 1}
+          data-swipe={swipeable}
+          onPointerDown={(event) => {
+            if (swipeable && event.pointerType !== "mouse" && event.isPrimary) {
+              swipe.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
+            }
+          }}
+          onPointerUp={(event) => {
+            const start = swipe.current;
+            swipe.current = undefined;
+            if (!swipeable || start?.id !== event.pointerId) {
+              return;
+            }
+            const dx = event.clientX - start.x;
+            const dy = event.clientY - start.y;
+            if (Math.abs(dx) >= SWIPE && Math.abs(dx) > 2 * Math.abs(dy)) {
+              (dx < 0 ? browse.onNext : browse.onPrevious)();
+            }
+          }}
+          onPointerCancel={() => {
+            swipe.current = undefined;
+          }}
+        >
           <div class="viewer-picture" style={{ width: `${String(width)}px` }}>
             <div class="viewer-dots" aria-hidden="true">
               <span class="viewer-dot" style={{ left: `calc(50% - ${String(strip / 2)}px)` }} />

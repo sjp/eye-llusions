@@ -6,7 +6,7 @@ import { linkPayload } from "../state/share.ts";
 import { ControlSheet, type SheetSnap } from "./ControlSheet.tsx";
 import { createDrawingTools, DrawingToolsContext } from "./drawing/tools.ts";
 import { Gallery, type GalleryFocus } from "./gallery/Gallery.tsx";
-import type { GallerySample } from "./gallery/samples.ts";
+import { GALLERY, type GallerySample } from "./gallery/samples.ts";
 import { LayersPanel } from "./layers/LayersPanel.tsx";
 import { TexturePanel } from "./texture/TexturePanel.tsx";
 import type { Renderer } from "./Preview.tsx";
@@ -81,6 +81,8 @@ export function App({
   /** Where focus goes once the open dialog has gone. */
   const afterDialog = useRef<HTMLElement | null>(null);
   const [galleryFocus, setGalleryFocus] = useState<GalleryFocus | undefined>(undefined);
+  /** The sample shown in a viewer opened from the gallery. */
+  const [browsing, setBrowsing] = useState(0);
   const compact = useMediaQuery(COMPACT_TOOLBAR);
   const fileInput = useRef<HTMLInputElement>(null);
   const [dialog, setDialog] = useState<Dialog>(undefined);
@@ -165,6 +167,15 @@ export function App({
     setDialog(undefined);
   };
 
+  const viewSample = (index: number): void => {
+    const at = (index + GALLERY.length) % GALLERY.length;
+    const sample = GALLERY[at];
+    setBrowsing(at);
+    // Leaving the viewer focuses the last sample seen.
+    setGalleryFocus({ sample: sample.id });
+    start(sample.recipe);
+  };
+
   if (viewing) {
     return (
       <Viewer
@@ -175,6 +186,19 @@ export function App({
         onHelp={setHelp}
         fullscreen={fullscreen}
         onFullscreen={toggleFullscreen}
+        browse={
+          screen === "gallery"
+            ? {
+                title: GALLERY[browsing].title,
+                onPrevious: () => {
+                  viewSample(browsing - 1);
+                },
+                onNext: () => {
+                  viewSample(browsing + 1);
+                },
+              }
+            : undefined
+        }
       />
     );
   }
@@ -185,8 +209,7 @@ export function App({
         renderer={thumbnailRenderer}
         focus={galleryFocus}
         onView={(sample: GallerySample) => {
-          setGalleryFocus({ sample: sample.id });
-          start(sample.recipe);
+          viewSample(GALLERY.indexOf(sample));
           enter();
         }}
         onRemix={(sample: GallerySample) => {

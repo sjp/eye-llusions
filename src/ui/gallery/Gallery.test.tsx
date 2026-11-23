@@ -131,6 +131,69 @@ describe("the gallery", () => {
     expect(screen.getByRole("dialog", { name: "Viewer" })).toBeTruthy();
   });
 
+  test("the viewer moves between samples with its buttons, arrow keys and swipes", async () => {
+    const { editor } = setup();
+    const last = GALLERY.at(-1);
+    fireEvent.click(screen.getByRole("button", { name: `View ${first.title}` }));
+    expect(screen.getByText(first.title, { selector: ".viewer-title" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Next sample" }));
+    expect(editor.recipe.value).toBe(GALLERY[1].recipe);
+    expect(screen.getByText(GALLERY[1].title, { selector: ".viewer-title" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Previous sample" }));
+    fireEvent.click(screen.getByRole("button", { name: "Previous sample" }));
+    // Round from the first to the last.
+    expect(editor.recipe.value).toBe(last?.recipe);
+    expect(editor.canUndo.value).toBe(false);
+
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(editor.recipe.value).toBe(first.recipe);
+    fireEvent.keyDown(window, { key: "ArrowLeft", altKey: true });
+    expect(editor.recipe.value).toBe(first.recipe);
+
+    const area = document.querySelector(".viewer-area");
+    if (area === null) {
+      throw new Error("No viewer area");
+    }
+    const swipe = (dx: number, dy: number, pointerType = "touch") => {
+      fireEvent.pointerDown(area, {
+        pointerId: 5,
+        pointerType,
+        isPrimary: true,
+        clientX: 200,
+        clientY: 200,
+      });
+      fireEvent.pointerUp(area, {
+        pointerId: 5,
+        pointerType,
+        clientX: 200 + dx,
+        clientY: 200 + dy,
+      });
+    };
+    swipe(-120, 10);
+    expect(editor.recipe.value).toBe(GALLERY[1].recipe);
+    swipe(120, 0);
+    expect(editor.recipe.value).toBe(first.recipe);
+    // Too short, too steep, or a mouse drag.
+    swipe(-30, 0);
+    swipe(-100, 80);
+    swipe(-120, 0, "mouse");
+    expect(editor.recipe.value).toBe(first.recipe);
+
+    swipe(-120, 0);
+    fireEvent.click(screen.getByRole("button", { name: "Exit" }));
+    await vi.waitFor(() => {
+      expect(document.activeElement?.getAttribute("aria-label")).toBe(`View ${GALLERY[1].title}`);
+    });
+  });
+
+  test("a viewer opened from Create doesn't move between samples", () => {
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: `Remix ${first.title}` }));
+    fireEvent.click(screen.getByRole("button", { name: "View" }));
+    expect(screen.getByRole("dialog", { name: "Viewer" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Next sample" })).toBeNull();
+  });
+
   test("leaving the viewer focuses the View button that opened it", async () => {
     setup();
     const view = screen.getByRole("button", { name: `View ${GALLERY[2].title}` });
