@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
-import { CORE_RASTERISERS } from "../core/depth/composite.ts";
+import { CORE_RASTERISERS, compositeDepth } from "../core/depth/composite.ts";
+import type { RasteriserRegistry } from "../core/depth/raster.ts";
 import { defaultRecipe, type Asset } from "../core/recipe.ts";
-import { renderPixels, restoreAssets } from "./pipeline.ts";
+import { createDepthCache, renderPixels, restoreAssets } from "./pipeline.ts";
 import type { RenderRequest } from "./protocol.ts";
 
 function asset(value: number): Asset {
@@ -27,15 +28,16 @@ describe("restoreAssets", () => {
   test("caches sent assets and restores cached ones by ID", () => {
     const cache = new Map<string, Asset>();
     const a = asset(1);
-    restoreAssets(cache, request({ assets: { a }, assetIds: ["a"] }));
-    const recipe = restoreAssets(cache, request({ assetIds: ["a"] }));
+    expect(restoreAssets(cache, request({ assets: { a }, assetIds: ["a"] })).changed).toBe(true);
+    const { recipe, changed } = restoreAssets(cache, request({ assetIds: ["a"] }));
     expect(recipe.assets).toEqual({ a });
+    expect(changed).toBe(false);
   });
 
   test("forgets assets the recipe no longer holds", () => {
     const cache = new Map<string, Asset>();
     restoreAssets(cache, request({ assets: { a: asset(1), b: asset(2) }, assetIds: ["a", "b"] }));
-    restoreAssets(cache, request({ assetIds: ["b"] }));
+    expect(restoreAssets(cache, request({ assetIds: ["b"] })).changed).toBe(true);
     expect([...cache.keys()]).toEqual(["b"]);
   });
 });
@@ -106,5 +108,78 @@ describe("renderPixels", () => {
     );
     await expect(result).rejects.toThrow("cancelled");
     expect(pauses).toBe(3);
+  });
+});
+
+describe("createDepthCache", () => {
+  function counting(): { registry: RasteriserRegistry; runs: () => number } {
+    let runs = 0;
+    const sample = CORE_RASTERISERS.sample;
+    return {
+      registry: {
+        ...CORE_RASTERISERS,
+        sample: (layer, context) => {
+          runs++;
+          return sample?.(layer, context);
+        },
+      },
+      runs: () => runs,
+    };
+  }
+
+  test("reuses depth when only the view or texture changes", async () => {
+    const cache = createDepthCache();
+    const { registry, runs } = counting();
+    const recipe = defaultRecipe();
+    const first = await cache.composite(recipe, 64, 36, registry);
+    const changed = {
+      ...recipe,
+      view: { ...recipe.view, repeats: 5 },
+      texture: { ...recipe.texture, scale: 2 },
+      seed: 1,
+    };
+    expect(await cache.composite(structuredClone(changed), 64, 36, registry)).toBe(first);
+    expect(runs()).toBe(1);
+  });
+
+  test("composites again when the layers, size or assets change", async () => {
+    const cache = createDepthCache();
+    const { registry, runs } = counting();
+    const recipe = defaultRecipe();
+    const first = Array.from(await cache.composite(recipe, 64, 36, registry));
+    const [sphere] = recipe.layers;
+    const moved = { ...recipe, layers: [{ ...sphere, depth: 0.5 }] };
+    const second = Array.from(await cache.composite(moved, 64, 36, registry));
+    expect(second).not.toEqual(first);
+    expect(Array.from(await compositeDepth(moved, 64, 36))).toEqual(second);
+    await cache.composite(moved, 32, 18, registry);
+    cache.assetsChanged();
+    await cache.composite(moved, 64, 36, registry);
+    expect(runs()).toBe(4);
+  });
+
+  test("keeps a draft and a full size at once", async () => {
+    const cache = createDepthCache();
+    const { registry, runs } = counting();
+    const recipe = defaultRecipe();
+    for (let round = 0; round < 3; round++) {
+      await cache.composite(recipe, 64, 36, registry);
+      await cache.composite(recipe, 32, 18, registry);
+    }
+    expect(runs()).toBe(2);
+  });
+
+  test("forgets a result that was stopped part way", async () => {
+    const cache = createDepthCache();
+    const { registry, runs } = counting();
+    const recipe = defaultRecipe();
+    await cache.composite(recipe, 64, 36, registry);
+    const moved = { ...recipe, layers: [{ ...recipe.layers[0], depth: 0.5 }] };
+    await expect(
+      cache.composite(moved, 64, 36, registry, () => Promise.reject(new Error("cancelled"))),
+    ).rejects.toThrow("cancelled");
+    const depth = await cache.composite(recipe, 64, 36, registry);
+    expect(Array.from(depth)).toEqual(Array.from(await compositeDepth(recipe, 64, 36)));
+    expect(runs()).toBe(2);
   });
 });

@@ -73,6 +73,18 @@ function blend(out: Float32Array, layer: Layer, { depth, coverage }: LayerField)
   }
 }
 
+/** Buffers `compositeDepth` may reuse; any of the wrong length are replaced. */
+type CompositeBuffers = {
+  /** Becomes the result. */
+  out?: Float32Array | undefined;
+  /** Scratch space for each layer in turn. */
+  target?: LayerField;
+};
+
+function sized(buffer: Float32Array | undefined, length: number): Float32Array {
+  return buffer?.length === length ? buffer : new Float32Array(length);
+}
+
 /**
  * Flattens the recipe's visible layers, bottom to top, into one depth buffer of
  * `width * height` values from 0 (far) to 1 (near). Each layer's depth is scaled by its
@@ -87,14 +99,16 @@ export async function compositeDepth(
   height: number,
   registry: RasteriserRegistry = CORE_RASTERISERS,
   pause?: () => Promise<void>,
+  buffers: CompositeBuffers = {},
 ): Promise<Float32Array> {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
     throw new RangeError("width and height must be positive integers");
   }
-  const out = new Float32Array(width * height);
+  const size = width * height;
+  const out = sized(buffers.out, size).fill(0);
   const target: LayerField = {
-    depth: new Float32Array(width * height),
-    coverage: new Float32Array(width * height),
+    depth: sized(buffers.target?.depth, size),
+    coverage: sized(buffers.target?.coverage, size),
   };
   const context: RasterContext = { recipe, width, height, target };
   for (const layer of recipe.layers) {
