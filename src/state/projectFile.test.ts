@@ -212,4 +212,19 @@ describe("PNG project files", () => {
       "invalid",
     );
   });
+
+  test("validates the recipe before inflating any asset", async () => {
+    const json = await embeddedJson(project());
+    const assets = { "image-1": { format: "gray", width: 300, height: 200, data: "@@" } };
+    const bad = { ...json, recipe: { ...defaultRecipe(), assets: undefined, layers: "x" }, assets };
+    expect(await problem(await withText(JSON.stringify(bad)))).toBe("invalid");
+  });
+
+  test("inflates only the assets the recipe uses", async () => {
+    const json = await embeddedJson(project());
+    const unused = { format: "gray", width: 300, height: 200, data: "@@" };
+    const assets = { ...(json.assets as object), unused };
+    const recipe = await readProject(await withText(JSON.stringify({ ...json, assets })));
+    expect(Object.keys(recipe.assets).toSorted()).toEqual(["image-1", "tile-1"]);
+  });
 });

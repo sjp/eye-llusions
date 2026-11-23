@@ -1,3 +1,4 @@
+import { referencedAssets } from "../core/assets.ts";
 import { insertChunk, readChunks } from "../core/png/chunks.ts";
 import { decodeITxt, encodeITxt } from "../core/png/itxt.ts";
 import { parseRecipe, RECIPE_LIMITS } from "../core/parseRecipe.ts";
@@ -87,13 +88,20 @@ function side(value: unknown): value is number {
   return Number.isInteger(value) && Number(value) >= 1 && Number(value) <= RECIPE_LIMITS.assetSide;
 }
 
-async function decodeAssets(input: unknown): Promise<Record<string, Asset>> {
+/** Inflates the assets with IDs in `wanted`, checking their sizes first. */
+async function decodeAssets(
+  input: unknown,
+  wanted: ReadonlySet<string>,
+): Promise<Record<string, Asset>> {
   if (!isFields(input) || Object.keys(input).length > RECIPE_LIMITS.assets) {
     throw new ProjectFileError("invalid");
   }
   const assets: [string, Asset][] = [];
   let total = 0;
   for (const [id, value] of Object.entries(input)) {
+    if (!wanted.has(id)) {
+      continue;
+    }
     if (
       !isFields(value) ||
       (value.format !== "gray" && value.format !== "rgba") ||
@@ -180,7 +188,15 @@ export async function readProject(bytes: Uint8Array): Promise<Recipe> {
     throw new ProjectFileError("invalid");
   }
   unpackStrokes(recipe);
-  const assets = await decodeAssets(project.assets);
+  // Validating the recipe first means a bad one costs nothing to inflate, and only the
+  // assets it uses are inflated.
+  let parsed: Recipe;
+  try {
+    parsed = parseRecipe(recipe);
+  } catch {
+    throw new ProjectFileError("invalid");
+  }
+  const assets = await decodeAssets(project.assets, new Set(referencedAssets(parsed)));
   try {
     return parseRecipe({ ...recipe, assets });
   } catch {
