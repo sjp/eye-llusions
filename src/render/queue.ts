@@ -17,6 +17,8 @@ type QueueOptions = {
   /** How long to work, in milliseconds, before a pause yields to waiting messages. */
   sliceMs?: number;
   now?: () => number;
+  /** Resolves once messages that were already waiting have been handled. */
+  yieldTask?: () => Promise<void>;
 };
 
 class RenderCancelledError extends Error {
@@ -30,9 +32,30 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+let channel: MessageChannel | undefined;
+const waiting: (() => void)[] = [];
+
+/**
+ * Resolves in a task queued behind any messages already waiting, through a message
+ * channel: repeated zero-delay timeouts are throttled to 4 ms each.
+ */
 function yieldToMessages(): Promise<void> {
+  if (typeof MessageChannel !== "function") {
+    return new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  }
+  if (channel === undefined) {
+    channel = new MessageChannel();
+    channel.port1.addEventListener("message", () => {
+      waiting.shift()?.();
+    });
+    channel.port1.start();
+  }
+  const port = channel.port2;
   return new Promise((resolve) => {
-    setTimeout(resolve, 0);
+    waiting.push(resolve);
+    port.postMessage(null);
   });
 }
 
@@ -45,7 +68,7 @@ function yieldToMessages(): Promise<void> {
 export function createRenderQueue(
   render: RenderRequestHandler,
   reply: Reply,
-  { sliceMs = 10, now = () => performance.now() }: QueueOptions = {},
+  { sliceMs = 10, now = () => performance.now(), yieldTask = yieldToMessages }: QueueOptions = {},
 ): (message: WorkerMessage) => Promise<void> {
   let queue = Promise.resolve();
   /** Requests with this ID or lower are no longer wanted. */
@@ -56,7 +79,7 @@ export function createRenderQueue(
     const { requestId } = request;
     const pause = async (): Promise<void> => {
       if (now() - lastYield >= sliceMs) {
-        await yieldToMessages();
+        await yieldTask();
         lastYield = now();
       }
       if (requestId <= staleThrough) {

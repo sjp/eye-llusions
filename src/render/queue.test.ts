@@ -19,6 +19,13 @@ function request(requestId: number): RenderRequest {
 
 const image = new ImageData(4, 4);
 
+/** Yields through a timer, which fake timers control. */
+function timeout(): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
+
 describe("createRenderQueue", () => {
   test("replies to each request in order", async () => {
     const replies: RenderResponse[] = [];
@@ -113,7 +120,7 @@ describe("createRenderQueue", () => {
         (response) => {
           replies.push(response);
         },
-        { sliceMs: 10, now: () => clock },
+        { sliceMs: 10, now: () => clock, yieldTask: timeout },
       );
       return { enqueue, started, replies, bands: () => bands };
     }
@@ -164,6 +171,26 @@ describe("createRenderQueue", () => {
       expect(started).toEqual([1]);
       expect(bands()).toBe(0);
       expect(replies).toEqual([{ requestId: 1, ok: false, message: "Cancelled" }]);
+    });
+
+    test("pauses yield to waiting messages without a timer", async () => {
+      let clock = 0;
+      let pauses = 0;
+      const enqueue = createRenderQueue(
+        async (_request, pause) => {
+          for (let i = 0; i < 5; i++) {
+            clock += 20;
+            await pause();
+            pauses++;
+          }
+          return { image, transfer: [] };
+        },
+        () => undefined,
+        { sliceMs: 10, now: () => clock },
+      );
+      await enqueue(request(1));
+      expect(pauses).toBe(5);
+      expect(vi.getTimerCount()).toBe(0);
     });
 
     test("pauses don't yield until the time slice is used up", async () => {
