@@ -73,7 +73,7 @@ describe("History", () => {
   });
 
   test("keeps at most the limit of undo steps", () => {
-    const history = new History(0, 3);
+    const history = new History(0, { limit: 3 });
     for (let i = 1; i <= 5; i++) {
       history.push(i);
     }
@@ -83,5 +83,51 @@ describe("History", () => {
     }
     expect(steps).toBe(3);
     expect(history.present).toBe(2);
+  });
+
+  describe("with a byte budget", () => {
+    type Value = { name: string; assets: Uint8Array[] };
+    const sizeOf = (value: Value) => value.assets.map((asset) => [asset, asset.length] as const);
+    const value = (name: string, ...assets: Uint8Array[]): Value => ({ name, assets });
+
+    function undoAll(history: History<Value>): string[] {
+      const names = [history.present.name];
+      while (history.undo()) {
+        names.push(history.present.name);
+      }
+      return names;
+    }
+
+    test("drops the oldest steps once the past and present hold more than the budget", () => {
+      const history = new History(value("a", new Uint8Array(40)), { sizeOf, budget: 100 });
+      history.push(value("b", new Uint8Array(40)));
+      history.push(value("c", new Uint8Array(40)));
+      expect(undoAll(history)).toEqual(["c", "b"]);
+    });
+
+    test("counts assets that several steps share once", () => {
+      const shared = new Uint8Array(60);
+      const history = new History(value("a", shared), { sizeOf, budget: 100 });
+      history.push(value("b", shared));
+      history.push(value("c", shared, new Uint8Array(20)));
+      history.push(value("d", shared, new Uint8Array(20)));
+      expect(undoAll(history)).toEqual(["d", "c", "b", "a"]);
+    });
+
+    test("never drops the present, even when it alone is over the budget", () => {
+      const history = new History(value("a", new Uint8Array(10)), { sizeOf, budget: 100 });
+      history.push(value("b", new Uint8Array(200)));
+      expect(history.present.name).toBe("b");
+      expect(history.canUndo).toBe(false);
+      history.push(value("c", new Uint8Array(10)));
+      expect(undoAll(history)).toEqual(["c"]);
+    });
+
+    test("counts a coalescing run's latest value", () => {
+      const history = new History(value("a", new Uint8Array(60)), { sizeOf, budget: 100 });
+      history.push(value("b"), "drag");
+      history.push(value("c", new Uint8Array(60)), "drag");
+      expect(undoAll(history)).toEqual(["c"]);
+    });
   });
 });
