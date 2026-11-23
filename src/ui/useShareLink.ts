@@ -1,4 +1,4 @@
-import { useEffect } from "preact/hooks";
+import { useCallback, useEffect, useRef } from "preact/hooks";
 import { missingAssets } from "../core/assets.ts";
 import type { Editor } from "../state/editor.ts";
 import { decodeRecipe, linkPayload, ShareLinkError } from "../state/share.ts";
@@ -18,28 +18,35 @@ function missingNotice(count: number): Notice | undefined {
 /**
  * Opens the shared scene in the address bar's `#r=` fragment, on load and whenever the
  * fragment changes. A link opened on load starts history over; a later one is an undo
- * step. A link that can't be opened leaves the current scene and reports an error notice.
- * `report` must keep its identity across renders.
+ * step, and `onOpen` follows each one opened. A link that can't be opened leaves the
+ * current scene and reports an error notice. `report` and `onOpen` must keep their
+ * identity across renders. Returns a function that takes the link out of the address bar.
  */
-export function useShareLink(editor: Editor, report: (notice: Notice | undefined) => void): void {
+export function useShareLink(
+  editor: Editor,
+  report: (notice: Notice | undefined) => void,
+  onOpen: () => void,
+): () => void {
+  const opened = useRef<string | undefined>(undefined);
+
   useEffect(() => {
     let latest = 0;
     let first = true;
-    let opened: string | undefined;
     const open = async (): Promise<void> => {
       const payload = linkPayload(location.hash);
       const fresh = first;
       first = false;
-      if (payload === undefined || payload === opened) {
+      if (payload === undefined || payload === opened.current) {
         return;
       }
-      opened = payload;
+      opened.current = payload;
       const request = ++latest;
       try {
         const recipe = await decodeRecipe(payload);
         if (request === latest) {
           editor.open(recipe, { fresh });
           report(missingNotice(missingAssets(recipe).length));
+          onOpen();
         }
       } catch (error) {
         if (request === latest) {
@@ -60,5 +67,12 @@ export function useShareLink(editor: Editor, report: (notice: Notice | undefined
       latest = -1;
       removeEventListener("hashchange", onHashChange);
     };
-  }, [editor, report]);
+  }, [editor, report, onOpen]);
+
+  return useCallback(() => {
+    opened.current = undefined;
+    if (linkPayload(location.hash) !== undefined) {
+      history.replaceState(history.state, "", `${location.pathname}${location.search}`);
+    }
+  }, []);
 }

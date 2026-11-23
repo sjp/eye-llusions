@@ -39,7 +39,7 @@ function setup(exportPng: ExportPng = () => Promise.resolve(new Blob([plainPng()
     render: vi.fn<Renderer["render"]>(() => new Promise(() => {})),
   };
   const exporter = vi.fn<ExportPng>(exportPng);
-  render(<App editor={editor} renderer={renderer} exportPng={exporter} />);
+  render(<App start="create" editor={editor} renderer={renderer} exportPng={exporter} />);
   return { editor, exporter };
 }
 
@@ -111,11 +111,13 @@ describe("the save dialog", () => {
       clicked.push(`${this.download} ${this.href}`);
     });
     const { editor, exporter } = setup();
+    editor.newSeed();
     openSave();
     fireEvent.click(screen.getByRole("button", { name: "Download" }));
     await vi.waitFor(() => {
       expect(clicked).toEqual(["eye-llusion-1920x1080.png blob:test"]);
     });
+    expect(editor.modified.value).toBe(false);
     expect(exporter).toHaveBeenCalledWith(editor.recipe.value, { width: 1920, height: 1080 });
     expect(created).toHaveBeenCalledOnce();
     vi.advanceTimersByTime(60_000);

@@ -10,7 +10,7 @@ function setup() {
   const renderer: Renderer = {
     render: vi.fn<Renderer["render"]>(() => new Promise(() => {})),
   };
-  render(<App editor={editor} renderer={renderer} />);
+  render(<App start="create" editor={editor} renderer={renderer} />);
   fireEvent.click(screen.getByRole("button", { name: "Add drawing" }));
   return editor;
 }

@@ -1,18 +1,23 @@
 import { useSignal } from "@preact/signals";
-import { useEffect, useRef, useState } from "preact/hooks";
-import { RenderClient } from "../render/client.ts";
+import { useCallback, useEffect, useRef, useState } from "preact/hooks";
+import { defaultRecipe } from "../core/recipe.ts";
 import { Editor } from "../state/editor.ts";
+import { linkPayload } from "../state/share.ts";
 import { ControlSheet, type SheetSnap } from "./ControlSheet.tsx";
 import { createDrawingTools, DrawingToolsContext } from "./drawing/tools.ts";
+import { Gallery } from "./gallery/Gallery.tsx";
+import type { GallerySample } from "./gallery/samples.ts";
 import { LayersPanel } from "./layers/LayersPanel.tsx";
 import { TexturePanel } from "./texture/TexturePanel.tsx";
 import type { Renderer } from "./Preview.tsx";
 import { renderPng, type ExportPng } from "./exportPng.ts";
+import { LeaveDialog } from "./LeaveDialog.tsx";
 import { NoticeBar, type Notice } from "./Notice.tsx";
 import { SaveDialog } from "./SaveDialog.tsx";
 import { ShareDialog } from "./ShareDialog.tsx";
 import { Stage } from "./Stage.tsx";
 import { useProjectFiles } from "./useProjectFiles.ts";
+import { useRenderer } from "./useRenderer.ts";
 import { useShareLink } from "./useShareLink.ts";
 import { useUndoShortcuts } from "./useUndoShortcuts.ts";
 import { useViewMode } from "./useViewMode.ts";
@@ -25,35 +30,26 @@ type Props = {
   renderer?: Renderer;
   /** Defaults to rendering PNG files in a worker of their own. */
   exportPng?: ExportPng;
+  /** Renders the gallery's thumbnails; defaults to a worker of the gallery's own. */
+  thumbnailRenderer?: Renderer;
+  /** The first screen; by default the gallery, unless the address holds a shared scene. */
+  start?: Screen;
 };
 
-type Dialog = "share" | "save" | undefined;
+type Dialog = "share" | "save" | "leave" | undefined;
+
+type Screen = "gallery" | "create";
 
 function hasFiles(event: DragEvent): boolean {
   return event.dataTransfer?.types.includes("Files") ?? false;
-}
-
-function useRenderer(given: Renderer | undefined): Renderer {
-  const [state] = useState(() => {
-    if (given !== undefined) {
-      return { renderer: given, owned: undefined };
-    }
-    const owned = new RenderClient();
-    return { renderer: owned, owned };
-  });
-  useEffect(
-    () => () => {
-      state.owned?.dispose();
-    },
-    [state],
-  );
-  return state.renderer;
 }
 
 export function App({
   editor: givenEditor,
   renderer: givenRenderer,
   exportPng = renderPng,
+  thumbnailRenderer,
+  start: firstScreen,
 }: Props) {
   const [editor] = useState(() => givenEditor ?? new Editor());
   const renderer = useRenderer(givenRenderer);
@@ -68,7 +64,13 @@ export function App({
   const fileInput = useRef<HTMLInputElement>(null);
   const [dialog, setDialog] = useState<Dialog>(undefined);
   const [notice, setNotice] = useState<Notice | undefined>(undefined);
-  useShareLink(editor, setNotice);
+  const [screen, setScreen] = useState<Screen>(
+    () => firstScreen ?? (linkPayload(location.hash) === undefined ? "gallery" : "create"),
+  );
+  const showCreate = useCallback(() => {
+    setScreen("create");
+  }, []);
+  const clearLink = useShareLink(editor, setNotice, showCreate);
   const openFile = useProjectFiles(editor, selection, setNotice);
   const wasViewing = useRef(false);
   useUndoShortcuts(editor);
@@ -85,6 +87,39 @@ export function App({
       <Viewer editor={editor} renderer={renderer} onExit={exit} help={help} onHelp={setHelp} />
     );
   }
+
+  const start = (recipe = defaultRecipe()): void => {
+    editor.open(recipe, { fresh: true });
+    selection.value = undefined;
+    setNotice(undefined);
+  };
+
+  if (screen === "gallery") {
+    return (
+      <Gallery
+        renderer={thumbnailRenderer}
+        onView={(sample: GallerySample) => {
+          start(sample.recipe);
+          enter();
+        }}
+        onRemix={(sample: GallerySample) => {
+          start(sample.recipe);
+          setScreen("create");
+        }}
+        onBlank={() => {
+          start();
+          setScreen("create");
+        }}
+      />
+    );
+  }
+
+  const leave = (): void => {
+    clearLink();
+    setDialog(undefined);
+    setNotice(undefined);
+    setScreen("gallery");
+  };
 
   return (
     <DrawingToolsContext.Provider value={tools}>
@@ -107,6 +142,27 @@ export function App({
         <header class="toolbar">
           <h1>Eye-llusion</h1>
           <div class="toolbar-actions">
+            <button
+              type="button"
+              class="button"
+              aria-haspopup={editor.modified.value ? "dialog" : undefined}
+              onClick={() => {
+                if (editor.modified.value) {
+                  setDialog("leave");
+                } else {
+                  leave();
+                }
+              }}
+              aria-label="Gallery"
+              title="Gallery"
+            >
+              <svg class="toolbar-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="4" y="4" width="7" height="7" rx="1" />
+                <rect x="13" y="4" width="7" height="7" rx="1" />
+                <rect x="4" y="13" width="7" height="7" rx="1" />
+                <rect x="13" y="13" width="7" height="7" rx="1" />
+              </svg>
+            </button>
             <button
               type="button"
               class="button"
@@ -204,15 +260,29 @@ export function App({
             onDownloadPng={() => {
               setDialog("save");
             }}
+            onShared={() => {
+              editor.markSaved();
+            }}
           />
         )}
         {dialog === "save" && (
           <SaveDialog
             recipe={editor.recipe.value}
             exportPng={exportPng}
+            onSaved={() => {
+              editor.markSaved();
+            }}
             onClose={() => {
               setDialog(undefined);
               saveButton.current?.focus();
+            }}
+          />
+        )}
+        {dialog === "leave" && (
+          <LeaveDialog
+            onLeave={leave}
+            onStay={() => {
+              setDialog(undefined);
             }}
           />
         )}

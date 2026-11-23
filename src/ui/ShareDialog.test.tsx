@@ -12,7 +12,7 @@ function setup() {
   const renderer: Renderer = {
     render: vi.fn<Renderer["render"]>(() => new Promise(() => {})),
   };
-  render(<App editor={editor} renderer={renderer} />);
+  render(<App start="create" editor={editor} renderer={renderer} />);
   return { editor };
 }
 
@@ -97,10 +97,12 @@ describe("the share dialog", () => {
     const writeText = vi.fn<(text: string) => Promise<void>>(() => Promise.resolve());
     stubNavigator({ clipboard: { writeText }, share: undefined });
     const { editor } = setup();
+    editor.newSeed();
     fireEvent.click(screen.getByRole("button", { name: "Share" }));
     const input = await screen.findByRole<HTMLInputElement>("textbox", { name: "Link" });
     expect(screen.queryByRole("button", { name: "Share…" })).toBeNull();
     expect(location.hash).toBe("");
+    expect(editor.modified.value).toBe(true);
 
     fireEvent.click(screen.getByRole("button", { name: "Copy link" }));
     await screen.findByText("Link copied.");
@@ -108,6 +110,7 @@ describe("the share dialog", () => {
     expect(location.href).toBe(input.value);
     const payload = linkPayload(location.hash);
     expect(payload).toBe(await encodeRecipe(editor.recipe.value));
+    expect(editor.modified.value).toBe(false);
     expect(screen.queryByText(/Images can't travel/)).toBeNull();
     expect(screen.queryByText(/cut links this long/)).toBeNull();
 

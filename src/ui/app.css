@@ -74,6 +74,14 @@ h2 {
   gap: 8px;
 }
 
+.toolbar-icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+  margin: 0 auto;
+  fill: currentColor;
+}
+
 .stage {
   display: flex;
   flex-direction: column;
@@ -862,6 +870,75 @@ h2 {
   background: var(--bg);
   color: var(--fg);
   font: inherit;
+}
+
+.gallery {
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+
+.gallery-header {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  max-width: 1200px;
+  margin: 0 auto 16px;
+}
+
+.gallery-header p {
+  max-width: 60ch;
+  margin: 0;
+  color: var(--muted);
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+}
+
+.gallery-card {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.gallery-thumbnail {
+  position: relative;
+}
+
+.gallery-thumbnail canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--surface-raised);
+}
+
+.gallery-thumbnail .panel-note {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 8px;
+  background: var(--surface);
+}
+
+.gallery-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+}
+
+.gallery-card-footer h2 {
+  flex: 1;
+  font-size: 1rem;
 }
 
 @media (max-width: 767px) {
