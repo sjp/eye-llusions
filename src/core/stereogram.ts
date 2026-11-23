@@ -135,6 +135,8 @@ export function renderStereogram(options: StereogramOptions): Uint8ClampedArray 
   const rise = cross ? new Float32Array(w) : z;
   const same = new Int32Array(w);
   const colour = new Uint32Array(w);
+  const nearest = new Int32Array(w);
+  const middle = (w - 1) / 2;
   // How far the surface rises above each point's sight lines at their shallowest
   // (`lower`) and steepest (`upper`) climb: a point above `lower` can't be hidden, and
   // one below `upper` must be. Rounding is far below the slack allowed for it.
@@ -228,8 +230,21 @@ export function renderStereogram(options: StereogramOptions): Uint8ClampedArray 
       same[left] = right;
     }
 
+    // Each pixel links to the rightmost pixel of its group. Each group takes its colour
+    // from the member nearest the middle, so distortion spreads both ways from there.
     for (let x = w - 1; x >= 0; x--) {
-      colour[x] = same[x] === x ? sample(x / oversample, y) >>> 0 : colour[same[x]];
+      same[x] = same[same[x]];
+    }
+    nearest.fill(-1);
+    for (let x = 0; x < w; x++) {
+      const root = same[x];
+      const best = nearest[root];
+      if (best < 0 || Math.abs(x - middle) < Math.abs(best - middle)) {
+        nearest[root] = x;
+      }
+    }
+    for (let x = w - 1; x >= 0; x--) {
+      colour[x] = same[x] === x ? sample(nearest[x] / oversample, y) >>> 0 : colour[same[x]];
     }
 
     let o = rowStart * 4;

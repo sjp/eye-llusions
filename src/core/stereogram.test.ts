@@ -174,11 +174,18 @@ describe("renderStereogram", () => {
     expect(render(depth)).toEqual(first);
   });
 
-  test("copies free pixels from the sampler", () => {
-    const image = render(flat(0));
-    for (let x = WIDTH - FAR_PERIOD; x < WIDTH; x++) {
-      expect(pixel(image, x, 2)).toBe(uniqueSample(x, 2));
+  test("samples each pixel group at its member nearest the middle", () => {
+    const middle = WIDTH / 2 - FAR_PERIOD / 2;
+    // Shapes on either side don't move the texture in the middle strip.
+    for (const depth of [flat(0), withRect(30, 80), withRect(320, 370)]) {
+      const image = render(depth);
+      for (let x = middle; x < middle + FAR_PERIOD; x++) {
+        expect(pixel(image, x, 2)).toBe(uniqueSample(x, 2));
+      }
     }
+    const image = render(flat(0));
+    expect(pixel(image, 0, 2)).not.toBe(uniqueSample(0, 2));
+    expect(pixel(image, WIDTH - 1, 2)).not.toBe(uniqueSample(WIDTH - 1, 2));
   });
 
   test("averages oversampled pixels down to the output width", () => {
