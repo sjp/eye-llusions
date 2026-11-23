@@ -120,6 +120,40 @@ describe("drawing on the preview", () => {
     expect(preview?.style.transform).toBe("translate(0px, 0px) scale(1)");
   });
 
+  test("a palm resting while the pen draws is ignored", () => {
+    const editor = setup();
+    const pen = { pointerId: 1, pointerType: "pen" };
+    const palm = { pointerId: 2, pointerType: "touch" };
+    down({ ...pen, x: 100, y: 100 });
+    down({ ...palm, x: 300, y: 150 });
+    move({ ...pen, x: 150, y: 100 });
+    move({ ...palm, x: 320, y: 170 });
+    up({ ...pen, x: 150, y: 100 });
+    move({ ...palm, x: 340, y: 190 });
+    up({ ...palm, x: 340, y: 190 });
+    expect(drawing(editor).strokes).toHaveLength(1);
+    expect(document.querySelector<HTMLElement>(".preview-surface")?.style.transform).toBe(
+      "translate(0px, 0px) scale(1)",
+    );
+  });
+
+  test("a palm that lands before the pen gives way to it", () => {
+    const editor = setup();
+    const palm = { pointerId: 2, pointerType: "touch" };
+    const pen = { pointerId: 1, pointerType: "pen" };
+    down({ ...palm, x: 300, y: 150 });
+    down({ ...pen, x: 100, y: 100 });
+    move({ ...palm, x: 320, y: 170 });
+    move({ ...pen, x: 150, y: 100 });
+    up({ ...pen, x: 150, y: 100 });
+    up({ ...palm, x: 320, y: 170 });
+    expect(drawing(editor).strokes).toHaveLength(1);
+    expect(drawing(editor).strokes[0].points[0]).toBeCloseTo(0.25);
+    expect(document.querySelector<HTMLElement>(".preview-surface")?.style.transform).toBe(
+      "translate(0px, 0px) scale(1)",
+    );
+  });
+
   test("move mode pans with one finger instead of drawing", () => {
     const editor = setup();
     fireEvent.click(screen.getByRole("radio", { name: "Move" }));

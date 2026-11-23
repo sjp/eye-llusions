@@ -20,6 +20,8 @@ type Props = {
 
 type Vector = { x: number; y: number };
 
+type Pointer = Vector & { type: string };
+
 type Live = {
   pointerId: number;
   brush: Brush;
@@ -47,7 +49,7 @@ const LIVE_COLOUR = "rgba(124, 196, 255, 0.6)";
  */
 export function DrawingSurface({ editor, layerId, strokes, tools, view, shown }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const pointers = useRef(new Map<number, Vector>());
+  const pointers = useRef(new Map<number, Pointer>());
   const live = useRef<Live | undefined>(undefined);
   const navigation = useRef<Navigation | undefined>(undefined);
   /** Committed strokes the preview hasn't shown yet, and the recipe that holds them. */
@@ -189,6 +191,19 @@ export function DrawingSurface({ editor, layerId, strokes, tools, view, shown }:
     };
   };
 
+  /** Forgets touches already down, such as a palm that landed before the pen. */
+  const dropTouches = (): void => {
+    for (const [id, { type }] of pointers.current) {
+      if (type === "touch") {
+        pointers.current.delete(id);
+        if (live.current?.pointerId === id) {
+          cancelStroke();
+        }
+      }
+    }
+    navigation.current = undefined;
+  };
+
   const onPointerDown = (event: PointerEvent): void => {
     if (event.pointerType === "mouse" && event.button !== 0) {
       return;
@@ -199,7 +214,19 @@ export function DrawingSurface({ editor, layerId, strokes, tools, view, shown }:
     } catch {
       // Capture is a nicety; synthetic pointers may not support it.
     }
-    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    const down = [...pointers.current.values()];
+    // A hand resting on the screen while a pen draws isn't input.
+    if (event.pointerType === "touch" && down.some(({ type }) => type === "pen")) {
+      return;
+    }
+    if (event.pointerType === "pen" && down.some(({ type }) => type === "touch")) {
+      dropTouches();
+    }
+    pointers.current.set(event.pointerId, {
+      x: event.clientX,
+      y: event.clientY,
+      type: event.pointerType,
+    });
     if (pointers.current.size === 1 && tools.tool.peek() === "draw") {
       startStroke(event);
       return;
@@ -214,7 +241,11 @@ export function DrawingSurface({ editor, layerId, strokes, tools, view, shown }:
     if (!pointers.current.has(event.pointerId)) {
       return;
     }
-    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    pointers.current.set(event.pointerId, {
+      x: event.clientX,
+      y: event.clientY,
+      type: event.pointerType,
+    });
     const stroke = live.current;
     if (stroke?.pointerId === event.pointerId) {
       const events =
