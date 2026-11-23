@@ -69,10 +69,18 @@ export function renderStereogram(options: StereogramOptions): Uint8ClampedArray 
 
   const cross = mode === "cross";
   const w = width * oversample;
-  // Cross-eyed mode views the inverted depth, so its background lies at z = 1.
-  const eye = cross ? ((2 - mu) * w) / ((1 - mu) * repeats) : (2 * w) / repeats;
-  const ztStep = 2 / (mu * eye);
+  // The viewer's eye separation, twice the background strip width in both modes.
+  const eye = (2 * w) / repeats;
+  // Cross-eyed separations are those of the inverted depth viewed wall-eyed with this
+  // wider eye separation, so that the background keeps the same strip width.
+  const separationEye = cross ? ((2 - mu) * w) / ((1 - mu) * repeats) : eye;
+  const wallStep = 2 / (mu * eye);
+  const crossStep = 2 / eye;
   const z = new Float32Array(w);
+  // Height of the surface in the real scene. Wall-eyed it is the depth, in units of the
+  // depth range above the far plane, with the eyes at 2 / mu. Cross-eyed it is the
+  // fraction of the viewing distance in front of the screen, with the eyes at 1.
+  const rise = cross ? new Float32Array(w) : z;
   const same = new Int32Array(w);
   const colour = new Uint32Array(w);
 
@@ -87,30 +95,35 @@ export function renderStereogram(options: StereogramOptions): Uint8ClampedArray 
       const d0 = depth[rowStart + i0];
       const d = d0 + (depth[rowStart + i1] - d0) * f;
       const clamped = d > 0 ? (d < 1 ? d : 1) : 0;
-      const value = cross ? 1 - clamped : clamped;
-      z[x] = value;
-      if (z[x] > rowMax) {
-        rowMax = z[x];
+      z[x] = cross ? 1 - clamped : clamped;
+      if (cross) {
+        const zx = z[x];
+        const s = ((1 - mu * zx) * separationEye) / (2 - mu * zx);
+        rise[x] = s / (eye + s);
+      }
+      if (rise[x] > rowMax) {
+        rowMax = rise[x];
       }
       same[x] = x;
     }
 
     for (let x = 0; x < w; x++) {
       const zx = z[x];
-      const s = Math.round(((1 - mu * zx) * eye) / (2 - mu * zx));
+      const s = Math.round(((1 - mu * zx) * separationEye) / (2 - mu * zx));
       let left = x - ((s + (s & y & 1)) >> 1);
       let right = left + s;
       if (left < 0 || right >= w) {
         continue;
       }
       // A point is hidden if the surface rises above either eye's line of sight to it.
-      const step = (2 - mu * zx) * ztStep;
+      const hx = rise[x];
+      const step = cross ? (1 - hx) * crossStep : (2 - mu * hx) * wallStep;
       const limit = rowMax < 1 ? rowMax : 1;
       let visible = true;
-      for (let t = 1, zt = zx + step; zt <= limit; t++, zt += step) {
+      for (let t = 1, ht = hx + step; ht <= limit; t++, ht += step) {
         const a = x - t;
         const b = x + t;
-        if ((a >= 0 && z[a] >= zt) || (b < w && z[b] >= zt)) {
+        if ((a >= 0 && rise[a] >= ht) || (b < w && rise[b] >= ht)) {
           visible = false;
           break;
         }

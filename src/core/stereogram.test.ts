@@ -64,6 +64,25 @@ function smallestPeriod(image: Uint8ClampedArray, y: number): number {
   return WIDTH;
 }
 
+/**
+ * Columns of row 0 whose own pair of pixels doesn't match, so the point there is
+ * hidden from an eye.
+ */
+function unconstrained(depth: Float32Array, mode: "wall" | "cross"): number[] {
+  const image = render(depth, { mode });
+  const eye = mode === "cross" ? ((2 - MU) * WIDTH) / ((1 - MU) * REPEATS) : EYE;
+  const hidden: number[] = [];
+  for (let x = 0; x < WIDTH; x++) {
+    const z = mode === "cross" ? 1 - depth[x] : depth[x];
+    const s = Math.round(((1 - MU * z) * eye) / (2 - MU * z));
+    const left = x - (s >> 1);
+    if (left >= 0 && left + s < WIDTH && pixel(image, left, 0) !== pixel(image, left + s, 0)) {
+      hidden.push(x);
+    }
+  }
+  return hidden;
+}
+
 describe("renderStereogram", () => {
   test("repeats exactly with half the eye separation over a flat far plane", () => {
     const image = render(flat(0));
@@ -102,14 +121,38 @@ describe("renderStereogram", () => {
     );
   });
 
-  test("inverts the depth in cross-eyed mode", () => {
+  test("matches the inverted wall-eyed render in cross-eyed mode where nothing is hidden", () => {
     const depth = new Float32Array(WIDTH * HEIGHT);
     for (let i = 0; i < depth.length; i++) {
-      depth[i] = ((i * 7919) % 101) / 100;
+      depth[i] = (i % WIDTH) / WIDTH;
     }
     const inverted = depth.map((d) => 1 - d);
     const sameEyeRepeats = (2 * REPEATS * (1 - MU)) / (2 - MU);
     expect(render(depth, { mode: "cross" })).toEqual(render(inverted, { repeats: sameEyeRepeats }));
+  });
+
+  test("leaves only the background beside a box edge unconstrained: 8 wall-eyed, 3 cross-eyed (was 10 of the box itself)", () => {
+    const depth = withRect(150, 250);
+    for (const [mode, perSide] of [
+      ["wall", 8],
+      ["cross", 3],
+    ] as const) {
+      const hidden = unconstrained(depth, mode);
+      expect(hidden.filter((x) => x < 150)).toHaveLength(perSide);
+      expect(hidden.filter((x) => x >= 250)).toHaveLength(perSide);
+      expect(hidden.every((x) => x >= 150 - perSide && x < 250 + perSide)).toBe(true);
+      expect(hidden.some((x) => x >= 150 && x < 250)).toBe(false);
+    }
+  });
+
+  test("leaves none of a cross-eyed sphere unconstrained (was 6 rim points)", () => {
+    const depth = new Float32Array(WIDTH * HEIGHT);
+    for (let i = 0; i < depth.length; i++) {
+      const u = ((i % WIDTH) - 200) / 80;
+      depth[i] = u * u < 1 ? Math.sqrt(1 - u * u) : 0;
+    }
+    const hidden = unconstrained(depth, "cross");
+    expect(hidden.filter((x) => depth[x] > 0)).toEqual([]);
   });
 
   test("gives the background the same strip width in both modes", () => {
