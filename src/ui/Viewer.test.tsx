@@ -59,6 +59,13 @@ describe("Viewer", () => {
     expect(onHelp).toHaveBeenLastCalledWith(false);
   });
 
+  test("only the advice is a live region", () => {
+    setup();
+    const live = document.querySelectorAll("[aria-live]");
+    expect(live).toHaveLength(1);
+    expect(live[0]?.classList.contains("viewer-advice")).toBe(true);
+  });
+
   test("presets wait until the image has a size", () => {
     setup();
     expect(screen.getByRole<HTMLButtonElement>("button", { name: "Phone" }).disabled).toBe(true);

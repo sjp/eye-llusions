@@ -217,12 +217,14 @@ export function Viewer({ editor, renderer, onExit, help, onHelp }: Props) {
           </div>
         </div>
       </div>
-      <div class="viewer-guide" aria-live="polite">
+      <div class="viewer-guide">
         <p>
           {view.mode === "wall" ? "Relax" : "Cross"} your eyes until you see three dots.{" "}
           <span class="viewer-strip">Strips are about {Math.round(stripMm)} mm wide.</span>
         </p>
-        {advice === undefined ? null : <p class="viewer-advice">{advice}</p>}
+        <p class="viewer-advice" aria-live="polite">
+          {advice}
+        </p>
       </div>
       {help ? (
         <HowTo
