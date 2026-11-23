@@ -493,20 +493,21 @@ function assets(value: unknown, path: string): Record<string, Asset> {
 }
 
 function recipe(value: unknown): Recipe {
+  // The version comes first: a recipe from another version may have other fields.
+  if (isFields(value) && Object.hasOwn(value, "version") && value.version !== RECIPE_VERSION) {
+    throw new RecipeError(
+      "version",
+      typeof value.version === "number"
+        ? `unsupported version ${String(value.version)}`
+        : "expected a version number",
+    );
+  }
   const fields = object(
     value,
     "",
     ["version", "aspect", "seed", "layers", "texture", "view"],
     ["assets"],
   );
-  if (fields.version !== RECIPE_VERSION) {
-    throw new RecipeError(
-      "version",
-      typeof fields.version === "number"
-        ? `unsupported version ${String(fields.version)}`
-        : "expected a version number",
-    );
-  }
   const seed = uint32(fields.seed, "seed");
   const aspect = number(fields.aspect, "aspect", 0.2, 5);
   const budget = { aspect, points: 0, area: 0 };
@@ -534,6 +535,18 @@ function recipe(value: unknown): Recipe {
     }),
     assets: Object.hasOwn(fields, "assets") ? assets(fields.assets, "assets") : {},
   });
+}
+
+/** Whether `error` rejected `input` only because a newer version of Eye-llusion wrote it. */
+export function isNewerRecipe(error: unknown, input: unknown): boolean {
+  if (!(error instanceof RecipeError) || error.path !== "version" || !isFields(input)) {
+    return false;
+  }
+  try {
+    return typeof input.version === "number" && input.version > RECIPE_VERSION;
+  } catch {
+    return false;
+  }
 }
 
 /**

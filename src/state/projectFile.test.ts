@@ -174,6 +174,14 @@ describe("PNG project files", () => {
     expect(await problem(await withText('{"format":2}'))).toBe("newer");
   });
 
+  test("reports recipes from a newer version", async () => {
+    const json = await embeddedJson(defaultRecipe());
+    const newer = { ...json, recipe: { ...(json.recipe as object), version: 2 } };
+    expect(await problem(await withText(JSON.stringify(newer)))).toBe("newer");
+    const older = { ...json, recipe: { ...(json.recipe as object), version: 0 } };
+    expect(await problem(await withText(JSON.stringify(older)))).toBe("invalid");
+  });
+
   test("rejects recipes that don't validate", async () => {
     const json = await embeddedJson(defaultRecipe());
     const bad = { ...json, recipe: { ...defaultRecipe(), assets: undefined, layers: "x" } };

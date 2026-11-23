@@ -1,5 +1,5 @@
 import { migrateRecipe } from "../core/migrateRecipe.ts";
-import { parseRecipe } from "../core/parseRecipe.ts";
+import { isNewerRecipe, parseRecipe } from "../core/parseRecipe.ts";
 import type { Layer, Recipe, Stroke } from "../core/recipe.ts";
 import { STROKE_GRID } from "../core/strokes.ts";
 import { compress, decompress, fromBase64Url, toBase64Url } from "./bytes.ts";
@@ -22,6 +22,7 @@ export class ShareLinkError extends Error {
 }
 
 const BROKEN = "This link is damaged or incomplete, so the shared scene couldn't be opened.";
+const NEWER = "This link was made by a newer version of Eye-llusion, so it couldn't be opened.";
 
 /** Strokes on the drawing grid travel as integer steps between points, which compress well. */
 type PackedStroke = { brush: Stroke["brush"]; steps: number[] };
@@ -99,11 +100,7 @@ export async function decodeRecipe(payload: string): Promise<Recipe> {
     throw new ShareLinkError(BROKEN);
   }
   if (Number(version) !== LINK_FORMAT) {
-    throw new ShareLinkError(
-      Number(version) > LINK_FORMAT
-        ? "This link was made by a newer version of Eye-llusion, so it couldn't be opened."
-        : BROKEN,
-    );
+    throw new ShareLinkError(Number(version) > LINK_FORMAT ? NEWER : BROKEN);
   }
   const body = payload.slice(dot + 1);
   if (body.length === 0 || body.length > MAX_PAYLOAD_CHARS) {
@@ -119,9 +116,11 @@ export async function decodeRecipe(payload: string): Promise<Recipe> {
   }
   try {
     return parseRecipe(migrateRecipe(input));
-  } catch {
+  } catch (error) {
     throw new ShareLinkError(
-      "This link doesn't describe a scene Eye-llusion can show, so it couldn't be opened.",
+      isNewerRecipe(error, input)
+        ? NEWER
+        : "This link doesn't describe a scene Eye-llusion can show, so it couldn't be opened.",
     );
   }
 }

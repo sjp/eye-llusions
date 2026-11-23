@@ -100,6 +100,17 @@ describe("share links", () => {
     await expect(decodeRecipe(`2${payload.slice(1)}`)).rejects.toThrow(/newer version/);
   });
 
+  test("say when a link holds a recipe from a newer version", async () => {
+    const newer = { ...defaultRecipe(), assets: undefined, version: 2, newField: true };
+    await expect(decodeRecipe(`1.${await compress(JSON.stringify(newer))}`)).rejects.toThrow(
+      /newer version/,
+    );
+    const older = { ...defaultRecipe(), assets: undefined, version: 0 };
+    await expect(decodeRecipe(`1.${await compress(JSON.stringify(older))}`)).rejects.toThrow(
+      /can show/,
+    );
+  });
+
   test("refuse payloads that inflate past the size cap", async () => {
     const bomb = await compress(`"${"a".repeat(20 * 1024 * 1024)}"`);
     await expect(decodeRecipe(`1.${bomb}`)).rejects.toBeInstanceOf(ShareLinkError);

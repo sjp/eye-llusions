@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { RECIPE_LIMITS, RecipeError, parseRecipe } from "./parseRecipe.ts";
+import { RECIPE_LIMITS, RecipeError, isNewerRecipe, parseRecipe } from "./parseRecipe.ts";
 import { strokeCost } from "./depth/drawing.ts";
 import { createRandom } from "./random.ts";
 import { scaleLimits } from "./texture/scale.ts";
@@ -539,5 +539,24 @@ describe("parseRecipe throws only RecipeError for hostile input", () => {
     expect(unexpected).toEqual([]);
     expect(accepted).toBeGreaterThan(0);
     expect(rejected).toBeGreaterThan(0);
+  });
+});
+
+describe("recipes from other versions", () => {
+  test("are rejected for their version before their fields", () => {
+    const newer = { version: 2, aspect: 1, shapes: [] };
+    expect(errorOf(newer).path).toBe("version");
+    expect(errorOf({ ...newer, version: 0 }).path).toBe("version");
+  });
+
+  test("are told apart when they come from a newer version", () => {
+    const judge = (input: unknown) => isNewerRecipe(errorOf(input), input);
+    expect(judge({ version: 2, shapes: [] })).toBe(true);
+    expect(judge(withValue("version", 2))).toBe(true);
+    expect(judge(withValue("version", 0))).toBe(false);
+    expect(judge(withValue("version", "2"))).toBe(false);
+    expect(judge(withValue("aspect", "wide"))).toBe(false);
+    expect(judge(null)).toBe(false);
+    expect(isNewerRecipe(new Error("version"), { version: 2 })).toBe(false);
   });
 });
