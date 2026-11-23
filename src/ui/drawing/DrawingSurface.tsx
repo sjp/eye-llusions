@@ -322,6 +322,9 @@ export function DrawingSurface({ editor, layerId, strokes, tools, view, shown }:
       onPointerCancel={(event) => {
         onPointerEnd(event, true);
       }}
+      onLostPointerCapture={(event) => {
+        onPointerEnd(event, true);
+      }}
       onWheel={onWheel}
       onContextMenu={(event) => {
         event.preventDefault();

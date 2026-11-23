@@ -154,6 +154,18 @@ describe("drawing on the preview", () => {
     );
   });
 
+  test("a pointer whose capture is lost no longer counts as down", () => {
+    const editor = setup();
+    down({ pointerId: 1, pointerType: "touch", x: 100, y: 100 });
+    fireEvent(surface(), new PointerEvent("lostpointercapture", { pointerId: 1, bubbles: true }));
+    expect(drawing(editor).strokes).toEqual([]);
+    const finger = { pointerId: 2, pointerType: "touch" };
+    down({ ...finger, x: 200, y: 100 });
+    move({ ...finger, x: 250, y: 120 });
+    up({ ...finger, x: 250, y: 120 });
+    expect(drawing(editor).strokes).toHaveLength(1);
+  });
+
   test("move mode pans with one finger instead of drawing", () => {
     const editor = setup();
     fireEvent.click(screen.getByRole("radio", { name: "Move" }));
