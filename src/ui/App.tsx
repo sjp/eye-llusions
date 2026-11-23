@@ -63,7 +63,7 @@ export function App({
   const [help, setHelp] = useState(true);
   const helpOpen = useRef(help);
   helpOpen.current = help;
-  const { viewing, enter, exit } = useViewMode(() => {
+  const { viewing, enter, exit, fullscreen, toggleFullscreen } = useViewMode(() => {
     // The instructions are the only thing that opens inside the viewer.
     if (!helpOpen.current) {
       return false;
@@ -167,7 +167,15 @@ export function App({
 
   if (viewing) {
     return (
-      <Viewer editor={editor} renderer={renderer} onExit={exit} help={help} onHelp={setHelp} />
+      <Viewer
+        editor={editor}
+        renderer={renderer}
+        onExit={exit}
+        help={help}
+        onHelp={setHelp}
+        fullscreen={fullscreen}
+        onFullscreen={toggleFullscreen}
+      />
     );
   }
 

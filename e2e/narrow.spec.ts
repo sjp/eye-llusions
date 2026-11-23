@@ -54,8 +54,12 @@ test("the viewer's controls fit a 360 px screen", async ({ page }) => {
   await page.getByRole("button", { name: "View" }).click();
   const viewer = page.getByRole("dialog", { name: "Viewer" });
   await expect(viewer.locator(".preview-canvas")).toHaveAttribute("data-quality", "full");
-  for (const name of ["Exit", "Peek", "Phone", "Monitor", "How to view"]) {
-    await expect(viewer.getByRole("button", { name, exact: true })).toBeInViewport({ ratio: 1 });
+  for (const name of ["Exit", "Peek", "Phone", "Monitor", "Full screen", "How to view"]) {
+    const button = viewer.getByRole("button", { name, exact: true });
+    // Only where the browser can go full screen.
+    if (name !== "Full screen" || (await button.count()) > 0) {
+      await expect(button).toBeInViewport({ ratio: 1 });
+    }
   }
   await expectNoSideways(page);
 });

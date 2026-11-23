@@ -25,6 +25,9 @@ type Props = {
   /** Whether the how-to-view instructions are open. */
   help: boolean;
   onHelp: (open: boolean) => void;
+  fullscreen?: boolean;
+  /** Toggles full screen; left out where the browser can't go full screen. */
+  onFullscreen?: (() => void) | undefined;
 };
 
 type Size = { width: number; height: number };
@@ -205,7 +208,15 @@ function HowTo({ mode, stripMm, onClose, onSwitchMode, onPractice }: HowToProps)
  * The distraction-free viewer: the stereogram as large as the screen allows, with
  * alignment dots one far-plane strip apart above it and help for seeing it.
  */
-export function Viewer({ editor: scene, renderer, onExit, help, onHelp }: Props) {
+export function Viewer({
+  editor: scene,
+  renderer,
+  onExit,
+  help,
+  onHelp,
+  fullscreen = false,
+  onFullscreen,
+}: Props) {
   const areaRef = useRef<HTMLDivElement>(null);
   const exitRef = useRef<HTMLButtonElement>(null);
   const helpRef = useRef<HTMLButtonElement>(null);
@@ -291,6 +302,11 @@ export function Viewer({ editor: scene, renderer, onExit, help, onHelp }: Props)
             Monitor
           </button>
         </div>
+        {onFullscreen === undefined ? null : (
+          <button type="button" class="button" aria-pressed={fullscreen} onClick={onFullscreen}>
+            Full screen
+          </button>
+        )}
         <button
           ref={helpRef}
           type="button"

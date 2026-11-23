@@ -129,6 +129,29 @@ test("leaving full screen closes the instructions first, then the viewer", async
   await expectCreate(page);
 });
 
+test("the full-screen toggle leaves and returns to full screen where it can", async ({ page }) => {
+  const { viewer } = await openViewer(page);
+  const toggle = viewer.getByRole("button", { name: "Full screen" });
+  const fullscreen = () => page.evaluate(() => document.fullscreenElement !== null);
+  if (!(await page.evaluate(() => (document.fullscreenEnabled as boolean | undefined) ?? false))) {
+    // As on iPhones.
+    await expect(toggle).toHaveCount(0);
+    return;
+  }
+  await expect.poll(fullscreen).toBe(true);
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await toggle.click();
+  await expect.poll(fullscreen).toBe(false);
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await expect(viewer).toBeVisible();
+  await expect(page.getByRole("region", { name: "How to view" })).toBeVisible();
+  await toggle.click();
+  await expect.poll(fullscreen).toBe(true);
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await viewer.getByRole("button", { name: "Exit" }).click();
+  await expectCreate(page);
+});
+
 test("going back leaves the viewer, not the app", async ({ page }) => {
   await openViewer(page);
   const url = page.url();

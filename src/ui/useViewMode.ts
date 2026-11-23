@@ -12,13 +12,24 @@ function ignore(): void {}
  * Exit by `exit`, Escape, going back or leaving full screen. Escape, and leaving full
  * screen, which browsers also do on Escape, first call `closeInner` to close something
  * open inside the viewer; it returns true if it did, and the viewer stays.
+ * `toggleFullscreen`, left out where the Fullscreen API isn't available, leaves or goes
+ * back to full screen without leaving the viewer.
  */
 export function useViewMode(closeInner?: () => boolean): {
   viewing: boolean;
   enter: () => void;
   exit: () => void;
+  fullscreen: boolean;
+  toggleFullscreen: (() => void) | undefined;
 } {
   const [viewing, setViewing] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  // Browsers without the Fullscreen API, such as on iPhones, leave it undefined.
+  const [canFullscreen] = useState(
+    () => (document.fullscreenEnabled as boolean | undefined) ?? false,
+  );
+  /** Full screen was left by `toggleFullscreen`, so the viewer stays. */
+  const leaving = useRef(false);
   const active = useRef(false);
   const inner = useRef(closeInner);
   inner.current = closeInner;
@@ -35,7 +46,6 @@ export function useViewMode(closeInner?: () => boolean): {
   const finish = useCallback(() => {
     active.current = false;
     setViewing(false);
-    // Browsers without the Fullscreen API, such as on iPhones, leave it undefined.
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(ignore);
     }
@@ -74,7 +84,12 @@ export function useViewMode(closeInner?: () => boolean): {
       }
     };
     const onFullscreenChange = (): void => {
+      setFullscreen(Boolean(document.fullscreenElement));
       if (document.fullscreenElement) {
+        return;
+      }
+      if (leaving.current) {
+        leaving.current = false;
         return;
       }
       const stay = escaped.current || (active.current && inner.current?.() === true);
@@ -104,5 +119,22 @@ export function useViewMode(closeInner?: () => boolean): {
     };
   }, [exit, finish]);
 
-  return { viewing, enter, exit };
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) {
+      leaving.current = true;
+      document.exitFullscreen().catch(() => {
+        leaving.current = false;
+      });
+    } else {
+      document.documentElement.requestFullscreen({ navigationUI: "hide" }).catch(ignore);
+    }
+  }, []);
+
+  return {
+    viewing,
+    enter,
+    exit,
+    fullscreen,
+    toggleFullscreen: canFullscreen ? toggleFullscreen : undefined,
+  };
 }

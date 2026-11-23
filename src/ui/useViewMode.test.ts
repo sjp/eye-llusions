@@ -178,6 +178,65 @@ describe("useViewMode", () => {
     expect(back).toHaveBeenCalledOnce();
   });
 
+  test("the full-screen toggle leaves and returns to full screen, staying in the viewer", () => {
+    const closeInner = vi.fn<() => boolean>(() => false);
+    const { result } = setup(closeInner);
+    act(() => {
+      result.current.enter();
+      setFullscreen(document.documentElement);
+    });
+    expect(result.current.fullscreen).toBe(true);
+    act(() => {
+      result.current.toggleFullscreen?.();
+    });
+    expect(exitFullscreen).toHaveBeenCalledOnce();
+    act(() => {
+      setFullscreen(null);
+    });
+    expect(result.current.fullscreen).toBe(false);
+    expect(result.current.viewing).toBe(true);
+    expect(closeInner).not.toHaveBeenCalled();
+
+    act(() => {
+      result.current.toggleFullscreen?.();
+    });
+    expect(requestFullscreen).toHaveBeenCalledTimes(2);
+    act(() => {
+      setFullscreen(document.documentElement);
+    });
+    expect(result.current.fullscreen).toBe(true);
+    // Leaving full screen otherwise still leaves the viewer.
+    act(() => {
+      setFullscreen(null);
+    });
+    expect(result.current.viewing).toBe(false);
+  });
+
+  test("a failed toggle out of full screen doesn't keep the viewer from leaving later", async () => {
+    exitFullscreen.mockImplementation(() => Promise.reject(new Error("no")));
+    const { result } = setup();
+    act(() => {
+      result.current.enter();
+      setFullscreen(document.documentElement);
+    });
+    act(() => {
+      result.current.toggleFullscreen?.();
+    });
+    // The failure is reported a moment later.
+    await Promise.resolve();
+    await Promise.resolve();
+    act(() => {
+      setFullscreen(null);
+    });
+    expect(result.current.viewing).toBe(false);
+  });
+
+  test("offers no full-screen toggle where full screen isn't available", () => {
+    Object.defineProperty(document, "fullscreenEnabled", { configurable: true, value: false });
+    const { result } = setup();
+    expect(result.current.toggleFullscreen).toBeUndefined();
+  });
+
   test("leaving full screen closes something inside the viewer first", () => {
     const closeInner = vi.fn<() => boolean>(() => true);
     const { result } = setup(closeInner);

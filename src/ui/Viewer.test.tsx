@@ -127,6 +127,37 @@ describe("Viewer", () => {
     expect(onExit).not.toHaveBeenCalled();
   });
 
+  test("offers a full-screen toggle only where it can go full screen", () => {
+    const onFullscreen = vi.fn<() => void>();
+    const editor = new Editor();
+    const renderer: Renderer = { render: vi.fn<Renderer["render"]>(() => new Promise(() => {})) };
+    const { rerender } = render(
+      <Viewer
+        editor={editor}
+        renderer={renderer}
+        onExit={() => {}}
+        help={false}
+        onHelp={() => {}}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Full screen" })).toBeNull();
+    rerender(
+      <Viewer
+        editor={editor}
+        renderer={renderer}
+        onExit={() => {}}
+        help={false}
+        onHelp={() => {}}
+        fullscreen={true}
+        onFullscreen={onFullscreen}
+      />,
+    );
+    const toggle = screen.getByRole("button", { name: "Full screen" });
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(toggle);
+    expect(onFullscreen).toHaveBeenCalledOnce();
+  });
+
   test("only the advice is a live region", () => {
     setup();
     const live = document.querySelectorAll("[aria-live]");
