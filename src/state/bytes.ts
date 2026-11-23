@@ -52,7 +52,22 @@ export function decompress(
   return collect(streamOf(bytes).pipeThrough(new DecompressionStream(format)), limit);
 }
 
+type Base64Options = { alphabet: "base64url"; omitPadding?: boolean };
+
+// The native base64 methods, which not every supported browser has yet.
+declare global {
+  interface Uint8Array {
+    toBase64?: (options: Base64Options) => string;
+  }
+  interface Uint8ArrayConstructor {
+    fromBase64?: (text: string, options: Base64Options) => Uint8Array<ArrayBuffer>;
+  }
+}
+
 export function toBase64Url(bytes: Uint8Array): string {
+  if (bytes.toBase64 !== undefined) {
+    return bytes.toBase64({ alphabet: "base64url", omitPadding: true });
+  }
   let binary = "";
   const CHUNK = 0x8000;
   for (let i = 0; i < bytes.length; i += CHUNK) {
@@ -65,6 +80,9 @@ export function toBase64Url(bytes: Uint8Array): string {
 export function fromBase64Url(text: string): Uint8Array<ArrayBuffer> {
   if (!/^[\w-]*$/.test(text) || text.length % 4 === 1) {
     throw new SyntaxError("Not base64url");
+  }
+  if (Uint8Array.fromBase64 !== undefined) {
+    return Uint8Array.fromBase64(text, { alphabet: "base64url" });
   }
   const binary = atob(text.replaceAll("-", "+").replaceAll("_", "/"));
   return Uint8Array.from(binary, (char) => char.codePointAt(0) ?? 0);
