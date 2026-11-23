@@ -158,6 +158,34 @@ describe("Viewer", () => {
     expect(onFullscreen).toHaveBeenCalledOnce();
   });
 
+  test("zooms in steps and sizes the picture back to fit", () => {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(
+      DOMRect.fromRect({ width: 800, height: 1000 }),
+    );
+    setup();
+    const picture = document.querySelector<HTMLElement>(".viewer-picture");
+    const fit = screen.getByRole<HTMLButtonElement>("button", { name: "Size to fit" });
+    expect(picture?.style.width).toBe("800px");
+    expect(fit.disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    expect(picture?.style.width).toBe("1000px");
+    fireEvent.click(screen.getByRole("button", { name: "Zoom out" }));
+    fireEvent.click(screen.getByRole("button", { name: "Zoom out" }));
+    expect(picture?.style.width).toBe("640px");
+    expect(fit.disabled).toBe(false);
+    fireEvent.click(fit);
+    expect(picture?.style.width).toBe("800px");
+    for (let i = 0; i < 10; i++) {
+      fireEvent.click(screen.getByRole("button", { name: "Zoom out" }));
+    }
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "Zoom out" }).disabled).toBe(true);
+    // Back up through the same steps lands exactly on fitting.
+    for (let i = 0; i < 6; i++) {
+      fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    }
+    expect(fit.disabled).toBe(true);
+  });
+
   test("only the advice is a live region", () => {
     setup();
     const live = document.querySelectorAll("[aria-live]");

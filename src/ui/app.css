@@ -426,7 +426,8 @@ h2 {
   gap: 8px;
 }
 
-.viewer-presets {
+.viewer-presets,
+.viewer-zoom {
   display: flex;
   gap: 4px;
 }
@@ -450,10 +451,19 @@ h2 {
 }
 
 .viewer-area {
-  display: grid;
-  place-items: center;
+  display: flex;
   min-height: 0;
   overflow: hidden;
+}
+
+.viewer-area[data-zoomed="true"] {
+  overflow: auto;
+}
+
+/* Auto margins centre the picture but, unlike centring, let all of it scroll into view. */
+.viewer-picture {
+  flex: none;
+  margin: auto;
 }
 
 .viewer-dots {

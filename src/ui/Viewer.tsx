@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "preact/hooks";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { previewDisplaySize } from "../render/resolution.ts";
 import { Editor } from "../state/editor.ts";
 import { PRACTICE_TARGET, practiceRecipe } from "./practice.ts";
@@ -14,6 +14,12 @@ type Context = keyof typeof STRIP_COMFORT;
 
 /** Height of the row of alignment dots above the image, in CSS pixels; app.css matches. */
 const DOT_ROW = 28;
+
+/** Each zoom button press scales the picture by this much. */
+const ZOOM_STEP = 1.25;
+/** The zoom range, relative to the picture fitting the screen. */
+const MIN_ZOOM = ZOOM_STEP ** -6;
+const MAX_ZOOM = ZOOM_STEP ** 6;
 
 /** A press on Peek at least this long, in milliseconds, is a hold rather than a tap. */
 const HOLD_MS = 300;
@@ -224,6 +230,8 @@ export function Viewer({
   const area = useSize(areaRef);
   const [context] = useState(viewingContext);
   const [peeking, setPeeking] = useState(false);
+  /** The picture's size relative to fitting the screen. */
+  const [zoom, setZoom] = useState(1);
   /** The practice image, shown instead of the scene without touching it. */
   const [practice, setPractice] = useState<Editor | undefined>(undefined);
   const editor = practice ?? scene;
@@ -241,6 +249,22 @@ export function Viewer({
     }
   }, [help]);
 
+  // Zooming, or the screen changing size, brings the middle of the picture to the middle.
+  useLayoutEffect(() => {
+    const element = areaRef.current;
+    if (element !== null) {
+      element.scrollLeft = (element.scrollWidth - element.clientWidth) / 2;
+      element.scrollTop = (element.scrollHeight - element.clientHeight) / 2;
+    }
+  }, [zoom, area.width, area.height]);
+  const zoomBy = (factor: number): void => {
+    setZoom((old) => {
+      const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, old * factor));
+      // Steps back to fitting land on it exactly.
+      return Math.abs(Math.log(next)) < 1e-9 ? 1 : next;
+    });
+  };
+
   const practising = practice !== undefined;
   const wasPractising = useRef(practising);
   useEffect(() => {
@@ -250,7 +274,8 @@ export function Viewer({
     wasPractising.current = practising;
   }, [practising]);
 
-  const width = Math.max(0, Math.min(area.width, (area.height - DOT_ROW) * aspect));
+  const fit = Math.max(0, Math.min(area.width, (area.height - DOT_ROW) * aspect));
+  const width = fit * zoom;
   const height = width / aspect;
   // The picture is shown in whole device pixels, a fraction narrower than its frame.
   const shown = previewDisplaySize(aspect, { width, height }, window.devicePixelRatio || 1);
@@ -302,6 +327,44 @@ export function Viewer({
             Monitor
           </button>
         </div>
+        <div class="viewer-zoom" role="group" aria-label="Zoom">
+          <button
+            type="button"
+            class="button"
+            aria-label="Zoom out"
+            title="Zoom out"
+            disabled={zoom <= MIN_ZOOM}
+            onClick={() => {
+              zoomBy(1 / ZOOM_STEP);
+            }}
+          >
+            −
+          </button>
+          <button
+            type="button"
+            class="button"
+            aria-label="Zoom in"
+            title="Zoom in"
+            disabled={zoom >= MAX_ZOOM}
+            onClick={() => {
+              zoomBy(ZOOM_STEP);
+            }}
+          >
+            +
+          </button>
+          <button
+            type="button"
+            class="button"
+            aria-label="Size to fit"
+            title="Size to fit"
+            disabled={zoom === 1}
+            onClick={() => {
+              setZoom(1);
+            }}
+          >
+            Fit
+          </button>
+        </div>
         {onFullscreen === undefined ? null : (
           <button type="button" class="button" aria-pressed={fullscreen} onClick={onFullscreen}>
             Full screen
@@ -320,7 +383,7 @@ export function Viewer({
         </button>
       </div>
       <div class="viewer-stage">
-        <div class="viewer-area" ref={areaRef}>
+        <div class="viewer-area" ref={areaRef} data-zoomed={zoom > 1}>
           <div class="viewer-picture" style={{ width: `${String(width)}px` }}>
             <div class="viewer-dots" aria-hidden="true">
               <span class="viewer-dot" style={{ left: `calc(50% - ${String(strip / 2)}px)` }} />

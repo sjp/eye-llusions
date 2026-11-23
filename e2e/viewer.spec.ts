@@ -202,6 +202,40 @@ test("Peek toggles the depth map", async ({ page, isMobile }) => {
   }
 });
 
+test("the zoom buttons resize the picture, keeping the dots a strip apart", async ({ page }) => {
+  const { viewer, canvas } = await openViewer(page);
+  await page.getByRole("button", { name: "Got it" }).click();
+  const fit = viewer.getByRole("button", { name: "Size to fit" });
+  await expect(fit).toBeDisabled();
+  const area = viewer.locator(".viewer-area");
+  // The width that fits the screen, below the row of dots, for the default 16:9 picture.
+  const fitted = () =>
+    area.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      return Math.min(bounds.width, ((bounds.height - 28) * 16) / 9);
+    });
+  const ratio = async () => (await box(viewer.locator(".viewer-picture"))).width / (await fitted());
+  const zoomIn = viewer.getByRole("button", { name: "Zoom in" });
+  await zoomIn.click();
+  await zoomIn.click();
+  await expect.poll(ratio).toBeCloseTo(1.5625, 2);
+  await expect(async () => {
+    const image = await box(canvas);
+    const dots = viewer.locator(".viewer-dot");
+    const [left, right] = [await box(dots.nth(0)), await box(dots.nth(1))];
+    expect(right.x - left.x).toBeCloseTo(image.width / 8, 0);
+    // The middle of the picture stays in the middle of the screen.
+    const bounds = await box(area);
+    expect(image.x + image.width / 2).toBeCloseTo(bounds.x + bounds.width / 2, -1);
+  }).toPass();
+
+  await fit.click();
+  await expect.poll(ratio).toBeCloseTo(1, 2);
+  await viewer.getByRole("button", { name: "Zoom out" }).click();
+  await expect.poll(ratio).toBeCloseTo(0.8, 2);
+  await expect(fit).toBeEnabled();
+});
+
 test("a size preset changes the repeats as an undoable step", async ({ page }) => {
   const { viewer, canvas } = await openViewer(page);
   const image = await box(canvas);
