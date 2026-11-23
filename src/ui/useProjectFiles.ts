@@ -1,5 +1,5 @@
 import type { Signal } from "@preact/signals";
-import { useCallback } from "preact/hooks";
+import { useCallback, useRef } from "preact/hooks";
 import { RECIPE_LIMITS } from "../core/parseRecipe.ts";
 import type { Editor } from "../state/editor.ts";
 import { canAddLayer, insertLayer, selectedLayer, withFreeIdentity } from "../state/layers.ts";
@@ -22,6 +22,8 @@ export function useProjectFiles(
   selection: Signal<string | undefined>,
   report: (notice: Notice | undefined) => void,
 ): (file: File, options?: { fresh?: boolean }) => Promise<void> {
+  /** Counts files opened, so one that finishes reading after a later one is dropped. */
+  const latest = useRef(0);
   const addImageLayer = useCallback(
     async (file: File): Promise<void> => {
       report(undefined);
@@ -68,15 +70,22 @@ export function useProjectFiles(
 
   return useCallback(
     async (file: File, { fresh = false }: { fresh?: boolean } = {}): Promise<void> => {
+      const request = ++latest.current;
       if (file.size > MAX_FILE_BYTES) {
         report({ tone: "error", text: "That file is too large to be an Eye-llusion project." });
         return;
       }
       try {
         const recipe = await readProjectOffThread(new Uint8Array(await file.arrayBuffer()));
+        if (request !== latest.current) {
+          return;
+        }
         editor.open(recipe, { fresh });
         report(undefined);
       } catch (error) {
+        if (request !== latest.current) {
+          return;
+        }
         if (error instanceof ProjectFileError && error.kind === "none") {
           report({
             tone: "error",
