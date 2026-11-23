@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { Recipe } from "../../core/recipe.ts";
 import { isRenderAborted, type RenderImage } from "../../render/client.ts";
 import type { Renderer } from "../Preview.tsx";
@@ -25,7 +25,33 @@ type Props = {
   onView: (sample: GallerySample) => void;
   onRemix: (sample: GallerySample) => void;
   onBlank: () => void;
+  /** A first-time card on how to view the samples, until it is dismissed. */
+  intro?: Intro | undefined;
 };
+
+type Intro = { onPractice: () => void; onDismiss: () => void };
+
+function IntroCard({ intro, onDismiss }: { intro: Intro; onDismiss: () => void }) {
+  const titleId = useId();
+  return (
+    <section class="gallery-intro" aria-labelledby={titleId}>
+      <h2 id={titleId}>New to magic-eye pictures?</h2>
+      <p>
+        Each picture hides a 3D shape in its pattern. Look through the screen as if at something far
+        away, and let your eyes relax until the two dots above the picture become three: the shape
+        then rises out of the pattern. The viewer has tips if it doesn't work at first.
+      </p>
+      <div class="gallery-intro-actions">
+        <button type="button" class="button" onClick={intro.onPractice}>
+          Try a practice image
+        </button>
+        <button type="button" class="button" onClick={onDismiss}>
+          Got it
+        </button>
+      </div>
+    </section>
+  );
+}
 
 /**
  * Renders the thumbnails of cards near the viewport one at a time, in gallery order, so
@@ -137,7 +163,7 @@ function Thumbnail({ sample, failed, onView }: ThumbnailProps) {
 }
 
 /** The first screen: ready-made scenes to view or remix, or a blank start. */
-export function Gallery({ renderer: given, focus, onView, onRemix, onBlank }: Props) {
+export function Gallery({ renderer: given, focus, onView, onRemix, onBlank, intro }: Props) {
   const renderer = useRenderer(given);
   const list = useRef<HTMLUListElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -169,6 +195,16 @@ export function Gallery({ renderer: given, focus, onView, onRemix, onBlank }: Pr
           Start from blank
         </button>
       </header>
+      {intro === undefined ? null : (
+        <IntroCard
+          intro={intro}
+          onDismiss={() => {
+            // The card and its focused button go.
+            heading.current?.focus();
+            intro.onDismiss();
+          }}
+        />
+      )}
       <ul ref={list} class="gallery-grid" aria-label="Samples">
         {GALLERY.map((sample) => (
           <li key={sample.id} class="gallery-card" data-id={sample.id}>

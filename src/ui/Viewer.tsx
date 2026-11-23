@@ -36,6 +36,8 @@ type Props = {
   onFullscreen?: (() => void) | undefined;
   /** Moves between samples, when the viewer was opened from the gallery. */
   browse?: Browse | undefined;
+  /** The scene is the practice image, sized for the screen once the viewer has measured it. */
+  practiceScene?: boolean;
 };
 
 type Browse = { title: string; onPrevious: () => void; onNext: () => void };
@@ -230,6 +232,7 @@ export function Viewer({
   fullscreen = false,
   onFullscreen,
   browse: browseAll,
+  practiceScene = false,
 }: Props) {
   const areaRef = useRef<HTMLDivElement>(null);
   const exitRef = useRef<HTMLButtonElement>(null);
@@ -274,6 +277,7 @@ export function Viewer({
   };
 
   const practising = practice !== undefined;
+  const showingPractice = practising || practiceScene;
   // Moving between samples would drop the practice image, and arrows and swipes scroll
   // a zoomed-in picture.
   const browse = practising ? undefined : browseAll;
@@ -318,6 +322,15 @@ export function Viewer({
 
   const fit = Math.max(0, Math.min(area.width, (area.height - DOT_ROW) * aspect));
   const width = fit * zoom;
+  const sized = useRef(false);
+  useEffect(() => {
+    if (practiceScene && !sized.current && fit > 0) {
+      sized.current = true;
+      const recipe = scene.recipe.peek();
+      const repeats = presetRepeats(context, fit);
+      scene.open({ ...recipe, view: { ...recipe.view, repeats } }, { fresh: true });
+    }
+  }, [practiceScene, fit, scene, context]);
   const height = width / aspect;
   // The picture is shown in whole device pixels, a fraction narrower than its frame.
   const shown = previewDisplaySize(aspect, { width, height }, window.devicePixelRatio || 1);
@@ -504,7 +517,7 @@ export function Viewer({
               editor.setView({ mode: OTHER[view.mode] });
             }}
             onPractice={
-              practising
+              showingPractice
                 ? undefined
                 : () => {
                     const repeats = width > 0 ? presetRepeats(context, width) : view.repeats;
@@ -516,7 +529,7 @@ export function Viewer({
         ) : null}
       </div>
       <div class="viewer-guide">
-        {practising ? (
+        {showingPractice ? (
           <p class="viewer-practice">Practice image: look for {PRACTICE_TARGET}.</p>
         ) : null}
         <p>

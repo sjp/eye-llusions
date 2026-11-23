@@ -201,6 +201,28 @@ test("the viewer moves between samples with its buttons, arrow keys and swipes",
   await expect(page.getByRole("button", { name: "View Hello" })).toBeFocused();
 });
 
+test("a first-time card explains viewing and opens a practice image", async ({ page }) => {
+  await openGallery(page);
+  const card = page.getByRole("region", { name: "New to magic-eye pictures?" });
+  await expect(card).toBeVisible();
+  await card.getByRole("button", { name: "Try a practice image" }).click();
+  const viewer = page.getByRole("dialog", { name: "Viewer" });
+  await expect(viewer.getByText(/Practice image: look for the word HI/)).toBeVisible();
+  await expect(viewer.locator(".preview-canvas")).toHaveAttribute("data-quality", "full");
+  await expect(viewer.getByRole("button", { name: "Next sample" })).toHaveCount(0);
+  await viewer.getByRole("button", { name: "Exit" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
+  await expect(card).toBeHidden();
+});
+
+test("the first-time card can be dismissed", async ({ page }) => {
+  await openGallery(page);
+  const card = page.getByRole("region", { name: "New to magic-eye pictures?" });
+  await card.getByRole("button", { name: "Got it" }).click();
+  await expect(card).toBeHidden();
+  await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
+});
+
 test("a file dropped on the gallery opens in Create", async ({ page, isMobile }) => {
   test.skip(isMobile, "Dragging files is a desktop gesture");
   await openGallery(page);

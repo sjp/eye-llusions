@@ -25,6 +25,7 @@ import { useMediaQuery } from "./useMediaQuery.ts";
 import { useShareLink } from "./useShareLink.ts";
 import { useUndoShortcuts } from "./useUndoShortcuts.ts";
 import { useUnloadWarning } from "./useUnloadWarning.ts";
+import { practiceRecipe } from "./practice.ts";
 import { useViewMode } from "./useViewMode.ts";
 import { Viewer } from "./Viewer.tsx";
 import { ViewPanel } from "./ViewPanel.tsx";
@@ -83,6 +84,10 @@ export function App({
   const [galleryFocus, setGalleryFocus] = useState<GalleryFocus | undefined>(undefined);
   /** The sample shown in a viewer opened from the gallery. */
   const [browsing, setBrowsing] = useState(0);
+  /** Whether the gallery's viewer shows the practice image rather than a sample. */
+  const [practising, setPractising] = useState(false);
+  /** The gallery's how-to-view card shows until dismissed or something is viewed. */
+  const [intro, setIntro] = useState(true);
   const compact = useMediaQuery(COMPACT_TOOLBAR);
   const fileInput = useRef<HTMLInputElement>(null);
   const [dialog, setDialog] = useState<Dialog>(undefined);
@@ -171,6 +176,8 @@ export function App({
     const at = (index + GALLERY.length) % GALLERY.length;
     const sample = GALLERY[at];
     setBrowsing(at);
+    setPractising(false);
+    setIntro(false);
     // Leaving the viewer focuses the last sample seen.
     setGalleryFocus({ sample: sample.id });
     start(sample.recipe);
@@ -186,8 +193,9 @@ export function App({
         onHelp={setHelp}
         fullscreen={fullscreen}
         onFullscreen={toggleFullscreen}
+        practiceScene={screen === "gallery" && practising}
         browse={
-          screen === "gallery"
+          screen === "gallery" && !practising
             ? {
                 title: GALLERY[browsing].title,
                 onPrevious: () => {
@@ -218,6 +226,22 @@ export function App({
         onBlank={() => {
           enterCreate();
         }}
+        intro={
+          intro
+            ? {
+                onPractice: () => {
+                  setIntro(false);
+                  setPractising(true);
+                  setGalleryFocus("heading");
+                  start(practiceRecipe("wall", defaultRecipe().view.repeats));
+                  enter();
+                },
+                onDismiss: () => {
+                  setIntro(false);
+                },
+              }
+            : undefined
+        }
       />
     );
   }

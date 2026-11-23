@@ -1014,6 +1014,33 @@ h2 {
   color: var(--muted);
 }
 
+.gallery-intro {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  max-width: 1200px;
+  margin: 0 auto 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.gallery-intro h2 {
+  font-size: 1rem;
+}
+
+.gallery-intro p {
+  max-width: 60ch;
+  margin: 0;
+}
+
+.gallery-intro-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .gallery-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/preact";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/preact";
 import { options } from "preact";
 import { describe, expect, onTestFinished, test, vi } from "vitest";
 import type { RenderImage } from "../../render/client.ts";
@@ -192,6 +192,42 @@ describe("the gallery", () => {
     fireEvent.click(screen.getByRole("button", { name: "View" }));
     expect(screen.getByRole("dialog", { name: "Viewer" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Next sample" })).toBeNull();
+  });
+
+  test("a how-to-view card shows until dismissed, focusing the heading", () => {
+    setup();
+    const card = screen.getByRole("region", { name: "New to magic-eye pictures?" });
+    fireEvent.click(within(card).getByRole("button", { name: "Got it" }));
+    expect(screen.queryByRole("region", { name: "New to magic-eye pictures?" })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("heading", { level: 1 }));
+    fireEvent.click(screen.getByRole("button", { name: `Remix ${first.title}` }));
+    fireEvent.click(screen.getByRole("button", { name: "Gallery" }));
+    expect(screen.queryByRole("region", { name: "New to magic-eye pictures?" })).toBeNull();
+  });
+
+  test("the how-to-view card goes once a sample has been viewed", async () => {
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: `View ${first.title}` }));
+    fireEvent.click(screen.getByRole("button", { name: "Exit" }));
+    await vi.waitFor(() => {
+      expect(screen.getByRole("button", { name: "Start from blank" })).toBeTruthy();
+    });
+    expect(screen.queryByRole("region", { name: "New to magic-eye pictures?" })).toBeNull();
+  });
+
+  test("the how-to-view card opens the practice image in the viewer", async () => {
+    const { editor } = setup();
+    fireEvent.click(screen.getByRole("button", { name: "Try a practice image" }));
+    expect(screen.getByRole("dialog", { name: "Viewer" })).toBeTruthy();
+    expect(screen.getByText(/Practice image: look for/)).toBeTruthy();
+    expect(editor.recipe.value.layers[0]?.kind).toBe("text");
+    expect(screen.queryByRole("button", { name: "Next sample" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Try a practice image" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Exit" }));
+    await vi.waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByRole("heading", { level: 1 }));
+    });
+    expect(screen.queryByRole("region", { name: "New to magic-eye pictures?" })).toBeNull();
   });
 
   test("leaving the viewer focuses the View button that opened it", async () => {
