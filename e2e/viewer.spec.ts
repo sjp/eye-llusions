@@ -28,14 +28,18 @@ async function expectCreate(page: Page) {
 
 test("the viewer fills the screen and the Exit button leaves it", async ({ page }) => {
   const { viewer, canvas } = await openViewer(page);
-  const size = page.viewportSize() ?? { width: 0, height: 0 };
-  const shown = await box(viewer);
-  expect(shown.width).toBeCloseTo(size.width, 0);
-  expect(shown.height).toBeCloseTo(size.height, 0);
-  // Rendered at the device pixel ratio.
-  const ratio = await page.evaluate(() => window.devicePixelRatio);
-  const pixels = await canvas.evaluate((element: HTMLCanvasElement) => element.width);
-  expect(pixels).toBeCloseTo((await box(canvas)).width * ratio, -1);
+  // Headless Firefox resizes the window to its own screen size a moment after going full
+  // screen, so measure against the window once the layout has settled.
+  await expect(async () => {
+    const size = await page.evaluate(() => [window.innerWidth, window.innerHeight]);
+    const shown = await box(viewer);
+    expect(shown.width).toBeCloseTo(size[0], 0);
+    expect(shown.height).toBeCloseTo(size[1], 0);
+    // Rendered at the device pixel ratio.
+    const ratio = await page.evaluate(() => window.devicePixelRatio);
+    const pixels = await canvas.evaluate((element: HTMLCanvasElement) => element.width);
+    expect(pixels).toBeCloseTo((await box(canvas)).width * ratio, -1);
+  }).toPass();
   await expect(page.getByRole("region", { name: "How to view" })).toBeVisible();
   await page.getByRole("button", { name: "Got it" }).click();
   await expect(page.getByRole("region", { name: "How to view" })).toBeHidden();
@@ -89,14 +93,17 @@ test("the alignment dots sit one far-plane strip apart above the image", async (
   const { viewer, canvas } = await openViewer(page);
   const dots = viewer.locator(".viewer-dot");
   await expect(dots).toHaveCount(2);
-  const image = await box(canvas);
-  const [left, right] = [await box(dots.nth(0)), await box(dots.nth(1))];
-  const centre = (dot: typeof left) => dot.x + dot.width / 2;
-  // The default recipe repeats eight times across the image.
-  expect(centre(right) - centre(left)).toBeCloseTo(image.width / 8, 1);
-  expect((centre(left) + centre(right)) / 2).toBeCloseTo(image.x + image.width / 2, 1);
-  expect(left.y + left.height).toBeLessThanOrEqual(image.y);
-  expect(left.y).toBeGreaterThan(image.y - 40);
+  // Polled, as the window can still be resizing for full screen.
+  await expect(async () => {
+    const image = await box(canvas);
+    const [left, right] = [await box(dots.nth(0)), await box(dots.nth(1))];
+    const centre = (dot: typeof left) => dot.x + dot.width / 2;
+    // The default recipe repeats eight times across the image.
+    expect(centre(right) - centre(left)).toBeCloseTo(image.width / 8, 1);
+    expect((centre(left) + centre(right)) / 2).toBeCloseTo(image.x + image.width / 2, 1);
+    expect(left.y + left.height).toBeLessThanOrEqual(image.y);
+    expect(left.y).toBeGreaterThan(image.y - 40);
+  }).toPass();
   await expect(viewer.getByText("until you see three dots")).toBeVisible();
 });
 
