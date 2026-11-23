@@ -1,7 +1,7 @@
 import type { Recipe } from "../core/recipe.ts";
 import { RenderClient, type RenderImage } from "../render/client.ts";
 import { EXPORT_OVERSAMPLE } from "../render/resolution.ts";
-import { embedProject } from "../state/projectFile.ts";
+import { embedProjectOffThread } from "../state/projectFileWorker.ts";
 
 type Size = { width: number; height: number };
 
@@ -67,7 +67,8 @@ export const renderPng: ExportPng = async (recipe, size, signal) => {
     signal?.throwIfAborted();
     const png = new Uint8Array(await (await encodePng(image)).arrayBuffer());
     signal?.throwIfAborted();
-    const blob = new Blob([await embedProject(png, recipe)], { type: "image/png" });
+    const file = await embedProjectOffThread(png, recipe, signal === undefined ? {} : { signal });
+    const blob = new Blob([file], { type: "image/png" });
     signal?.throwIfAborted();
     return blob;
   } finally {

@@ -3,7 +3,8 @@ import { useCallback } from "preact/hooks";
 import { RECIPE_LIMITS } from "../core/parseRecipe.ts";
 import type { Editor } from "../state/editor.ts";
 import { canAddLayer, insertLayer, selectedLayer, withFreeIdentity } from "../state/layers.ts";
-import { ProjectFileError, readProject } from "../state/projectFile.ts";
+import { ProjectFileError } from "../state/projectFile.ts";
+import { readProjectOffThread } from "../state/projectFileWorker.ts";
 import { ImageImportError, importImage } from "./layers/importImage.ts";
 import { LAYER_KINDS } from "./layers/kinds.ts";
 import type { Notice } from "./Notice.tsx";
@@ -72,7 +73,7 @@ export function useProjectFiles(
         return;
       }
       try {
-        const recipe = await readProject(new Uint8Array(await file.arrayBuffer()));
+        const recipe = await readProjectOffThread(new Uint8Array(await file.arrayBuffer()));
         editor.open(recipe, { fresh });
         report(undefined);
       } catch (error) {
