@@ -1,11 +1,11 @@
 // Draws the bundled figure depth maps from the procedural shapes below and writes them
 // to src/assets/figures/ as 8-bit grey-and-alpha PNGs: grey is depth (white is near) and
-// alpha is coverage. Everything is plain arithmetic and a fixed zlib level, so running
+// alpha is coverage. PNGs there for figures no longer listed are deleted. Everything is plain arithmetic and a fixed zlib level, so running
 // it again produces byte-identical files.
 //
 //   node scripts/generate-figures.mjs
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { crc32, deflateSync } from "node:zlib";
@@ -444,6 +444,11 @@ function encodePng(pixels) {
 }
 
 mkdirSync(OUT, { recursive: true });
+for (const file of readdirSync(OUT)) {
+  if (file.endsWith(".png") && !Object.hasOwn(FIGURES, file.slice(0, -4))) {
+    rmSync(join(OUT, file));
+  }
+}
 for (const [id, parts] of Object.entries(FIGURES)) {
   writeFileSync(join(OUT, `${id}.png`), encodePng(draw(parts)));
 }
