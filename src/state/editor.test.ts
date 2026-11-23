@@ -1,6 +1,11 @@
 import { effect } from "@preact/signals";
 import { describe, expect, test } from "vitest";
-import { defaultRecipe, type Asset, type ImageLayer } from "../core/recipe.ts";
+import {
+  DEPTH_OF_FIELD_RANGE,
+  defaultRecipe,
+  type Asset,
+  type ImageLayer,
+} from "../core/recipe.ts";
 import { scaleLimits } from "../core/texture/scale.ts";
 import { Editor } from "./editor.ts";
 
@@ -95,6 +100,19 @@ describe("Editor", () => {
     expect(editor.recipe.value.texture.scale).toBe(scaleLimits("cells", aspect, 8).max);
     editor.setView({ repeats: 32 });
     expect(editor.recipe.value.texture.scale).toBe(scaleLimits("cells", aspect, 32).max);
+  });
+
+  test("keeps the depth of field within the range for the viewing mode", () => {
+    const editor = new Editor();
+    editor.setView({ depthOfField: 0.8 });
+    expect(editor.recipe.value.view.depthOfField).toBe(0.8);
+    editor.setView({ mode: "cross" });
+    expect(editor.recipe.value.view.depthOfField).toBe(DEPTH_OF_FIELD_RANGE.cross.max);
+    editor.undo();
+    expect(editor.recipe.value.view).toMatchObject({ depthOfField: 0.8, mode: "wall" });
+    editor.redo();
+    editor.setView({ depthOfField: 0.9 });
+    expect(editor.recipe.value.view.depthOfField).toBe(DEPTH_OF_FIELD_RANGE.cross.max);
   });
 
   test("a layer update that returns the same stack adds no undo step", () => {

@@ -1,5 +1,6 @@
 import {
   RECIPE_VERSION,
+  clampDepthOfField,
   type Asset,
   type Brush,
   type DrawingLayer,
@@ -511,11 +512,11 @@ function recipe(value: unknown): Recipe {
     seed,
     layers,
     texture: texture(fields.texture, "texture"),
-    view: {
+    view: clampDepthOfField({
       repeats: number(view.repeats, "view.repeats", 2, 32),
       depthOfField: number(view.depthOfField, "view.depthOfField", 0.05, 0.9),
       mode: oneOf(view.mode, "view.mode", ["wall", "cross"]),
-    },
+    }),
     assets: Object.hasOwn(fields, "assets") ? assets(fields.assets, "assets") : {},
   });
 }

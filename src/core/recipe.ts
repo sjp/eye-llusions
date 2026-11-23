@@ -30,6 +30,23 @@ type ViewSettings = {
   mode: "wall" | "cross";
 };
 
+/**
+ * Depth of field range per viewing mode. Cross-eyed, near points are wider apart than
+ * the background strip, by 1.5 times at 0.5, and deeper fields soon become impossible
+ * to fuse.
+ */
+export const DEPTH_OF_FIELD_RANGE = {
+  wall: { min: 0.05, max: 0.9 },
+  cross: { min: 0.05, max: 0.5 },
+} as const satisfies Record<ViewSettings["mode"], { min: number; max: number }>;
+
+/** `view` with its depth of field clamped into the range for its mode. */
+export function clampDepthOfField(view: ViewSettings): ViewSettings {
+  const { min, max } = DEPTH_OF_FIELD_RANGE[view.mode];
+  const depthOfField = Math.min(max, Math.max(min, view.depthOfField));
+  return depthOfField === view.depthOfField ? view : { ...view, depthOfField };
+}
+
 export type Point = { x: number; y: number };
 
 type BlendMode = "max" | "add" | "subtract" | "replace";

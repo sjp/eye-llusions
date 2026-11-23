@@ -1,7 +1,13 @@
 import { batch, signal, type ReadonlySignal } from "@preact/signals";
 import { pruneAssets } from "../core/assets.ts";
 import { clampScale } from "../core/texture/scale.ts";
-import { defaultRecipe, type Asset, type Layer, type Recipe } from "../core/recipe.ts";
+import {
+  clampDepthOfField,
+  defaultRecipe,
+  type Asset,
+  type Layer,
+  type Recipe,
+} from "../core/recipe.ts";
 import { History } from "./history.ts";
 
 type View = Recipe["view"];
@@ -63,9 +69,15 @@ export class Editor {
     this.imagesUnsaved = this.#imagesUnsaved;
   }
 
-  /** The texture scale follows the strip width into its fusible range. */
+  /**
+   * The depth of field is clamped into the range for the viewing mode, and the texture
+   * scale follows the strip width into its fusible range.
+   */
   setView(patch: Partial<View>, options: EditOptions = {}): void {
-    this.#edit((recipe) => clampScale({ ...recipe, view: { ...recipe.view, ...patch } }), options);
+    this.#edit(
+      (recipe) => clampScale({ ...recipe, view: clampDepthOfField({ ...recipe.view, ...patch }) }),
+      options,
+    );
   }
 
   /**

@@ -217,7 +217,13 @@ describe("parseRecipe clamps finite numbers into range", () => {
     ["aspect", -3, 0.2],
     ["view.repeats", 1e9, 32],
     ["view.depthOfField", 0, 0.05],
-    ["view.depthOfField", 1, 0.9],
+    [
+      "view",
+      { repeats: 10, depthOfField: 1, mode: "wall" },
+      { repeats: 10, depthOfField: 0.9, mode: "wall" },
+    ],
+    // Cross-eyed links from before the cross-eyed limit still open.
+    ["view.depthOfField", 0.9, 0.5],
     ["layers.0.depth", 1.5, 1],
     ["layers.0.shape.rings", 1000, 32],
     ["layers.1.center", { x: -9, y: 9 }, { x: -0.5, y: 1.5 }],
