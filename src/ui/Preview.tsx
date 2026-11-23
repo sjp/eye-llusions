@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { Recipe } from "../core/recipe.ts";
 import { isRenderAborted, type RenderClient, type RenderImage } from "../render/client.ts";
 import type { RenderOutput } from "../render/protocol.ts";
-import { createPreviewScheduler, previewSize } from "../render/resolution.ts";
+import { createPreviewScheduler, previewDisplaySize, previewSize } from "../render/resolution.ts";
 import type { Editor } from "../state/editor.ts";
 
 export type Renderer = Pick<RenderClient, "render">;
@@ -24,12 +24,6 @@ type Props = {
   /** Laid over the picture, at its size, and transformed with it. */
   children?: ComponentChildren;
 };
-
-/** The largest CSS size with the given aspect that fits the box. */
-function fit(aspect: number, box: Box): { width: number; height: number } {
-  const width = Math.min(box.width, box.height * aspect);
-  return { width, height: width / aspect };
-}
 
 function draw(canvas: HTMLCanvasElement, image: RenderImage): void {
   canvas.width = image.width;
@@ -106,7 +100,7 @@ export function Preview({ editor, renderer, output, transform, onShown, children
         return;
       }
       draw(canvas, image);
-      const shown = fit(recipe.aspect, current);
+      const shown = previewDisplaySize(recipe.aspect, current, current.pixelRatio);
       canvas.style.width = `${String(shown.width)}px`;
       canvas.style.height = `${String(shown.height)}px`;
       renders++;

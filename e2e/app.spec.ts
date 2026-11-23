@@ -234,3 +234,28 @@ test("keyboard shortcuts undo and redo a slider step", async ({ page, isMobile }
   await page.keyboard.press("ControlOrMeta+Shift+z");
   await expect(slider).toHaveValue("10");
 });
+
+test.describe("at a fractional device pixel ratio", () => {
+  test.use({ deviceScaleFactor: 2.625, viewport: { width: 411, height: 731 } });
+
+  test("the full preview is shown one canvas pixel per device pixel", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium", "Only Chromium emulates a fractional ratio");
+    const { canvas } = await open(page);
+    const sizes = await canvas.evaluate((element: HTMLCanvasElement) => {
+      const { width, height } = element.getBoundingClientRect();
+      const ratio = window.devicePixelRatio;
+      return {
+        ratio,
+        pixels: [element.width, element.height],
+        shown: [width * ratio, height * ratio],
+      };
+    });
+    expect(sizes.ratio).toBe(2.625);
+    // Layout rounds to 1/64 of a CSS pixel; anything well under a device pixel is exact.
+    expect(sizes.shown[0]).toBeCloseTo(sizes.pixels[0], 1);
+    expect(sizes.shown[1]).toBeCloseTo(sizes.pixels[1], 1);
+  });
+});

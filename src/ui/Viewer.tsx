@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "preact/hooks";
+import { previewDisplaySize } from "../render/resolution.ts";
 import type { Editor } from "../state/editor.ts";
 import { Preview, type Renderer } from "./Preview.tsx";
 import {
@@ -164,7 +165,9 @@ export function Viewer({ editor, renderer, onExit, help, onHelp }: Props) {
 
   const width = Math.max(0, Math.min(area.width, (area.height - DOT_ROW) * aspect));
   const height = width / aspect;
-  const strip = width / view.repeats;
+  // The picture is shown in whole device pixels, a fraction narrower than its frame.
+  const shown = previewDisplaySize(aspect, { width, height }, window.devicePixelRatio || 1);
+  const strip = shown.width / view.repeats;
   const stripMm = cssPixelsToMillimetres(strip);
   const advice = width > 0 ? stripAdvice(context, stripMm, area.height > area.width) : undefined;
   const preset = (target: Context): void => {

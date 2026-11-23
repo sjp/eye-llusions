@@ -11,6 +11,17 @@ type RenderQuality = "draft" | "full";
 
 type Size = { width: number; height: number };
 
+/** The largest size with the given aspect that fits `box` at `pixelRatio`, in device pixels. */
+function fitDevicePixels(aspect: number, box: Size, pixelRatio: number): Size {
+  let width = Math.max(0, box.width) * pixelRatio;
+  let height = width / aspect;
+  if (height > box.height * pixelRatio) {
+    height = Math.max(0, box.height) * pixelRatio;
+    width = height * aspect;
+  }
+  return { width, height };
+}
+
 /**
  * Pixel size of a preview with the given aspect (width / height) that fits `box`, in
  * CSS pixels, at `pixelRatio` device pixels per CSS pixel. Full previews are capped at
@@ -22,12 +33,7 @@ export function previewSize(
   pixelRatio: number,
   quality: RenderQuality,
 ): Size {
-  let width = Math.max(0, box.width) * pixelRatio;
-  let height = width / aspect;
-  if (height > box.height * pixelRatio) {
-    height = Math.max(0, box.height) * pixelRatio;
-    width = height * aspect;
-  }
+  const { width, height } = fitDevicePixels(aspect, box, pixelRatio);
   let scale = 1;
   if (width * height > PREVIEW_MAX_PIXELS) {
     scale = Math.sqrt(PREVIEW_MAX_PIXELS / (width * height));
@@ -38,6 +44,18 @@ export function previewSize(
   return {
     width: Math.max(1, Math.floor(width * scale)),
     height: Math.max(1, Math.floor(height * scale)),
+  };
+}
+
+/**
+ * CSS size at which to show a preview that fits `box`: whole device pixels, so a full
+ * preview below the cap is shown one pixel per device pixel, without resampling.
+ */
+export function previewDisplaySize(aspect: number, box: Size, pixelRatio: number): Size {
+  const { width, height } = fitDevicePixels(aspect, box, pixelRatio);
+  return {
+    width: Math.max(1, Math.floor(width)) / pixelRatio,
+    height: Math.max(1, Math.floor(height)) / pixelRatio,
   };
 }
 

@@ -9,6 +9,7 @@ import {
   presetExportSize,
   DRAFT_SCALE,
   PREVIEW_MAX_PIXELS,
+  previewDisplaySize,
   previewSize,
   SETTLE_DELAY_MS,
 } from "./resolution.ts";
@@ -40,6 +41,18 @@ describe("previewSize", () => {
 
   test("never returns an empty size", () => {
     expect(previewSize(1, { width: 0, height: 0 }, 1, "draft")).toEqual({ width: 1, height: 1 });
+  });
+});
+
+describe("previewDisplaySize", () => {
+  test("shows a full preview at a fractional ratio one pixel per device pixel", () => {
+    const box = { width: 411, height: 500.3 };
+    const pixels = previewSize(0.8, box, 2.625, "full");
+    const shown = previewDisplaySize(0.8, box, 2.625);
+    expect(shown.width * 2.625).toBeCloseTo(pixels.width, 9);
+    expect(shown.height * 2.625).toBeCloseTo(pixels.height, 9);
+    expect(shown.width).toBeLessThanOrEqual(box.width);
+    expect(shown.height).toBeLessThanOrEqual(box.height);
   });
 });
 
