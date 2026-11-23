@@ -20,6 +20,7 @@ import { useProjectFiles } from "./useProjectFiles.ts";
 import { useRenderer } from "./useRenderer.ts";
 import { useShareLink } from "./useShareLink.ts";
 import { useUndoShortcuts } from "./useUndoShortcuts.ts";
+import { useUnloadWarning } from "./useUnloadWarning.ts";
 import { useViewMode } from "./useViewMode.ts";
 import { Viewer } from "./Viewer.tsx";
 import { ViewPanel } from "./ViewPanel.tsx";
@@ -74,6 +75,7 @@ export function App({
   const openFile = useProjectFiles(editor, selection, setNotice);
   const wasViewing = useRef(false);
   useUndoShortcuts(editor);
+  useUnloadWarning(screen === "create" && editor.modified.value);
 
   useEffect(() => {
     if (wasViewing.current && !viewing) {

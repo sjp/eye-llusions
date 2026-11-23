@@ -103,6 +103,29 @@ describe("the gallery", () => {
     expect(screen.getByRole("button", { name: "Start from blank" })).toBeTruthy();
   });
 
+  test("the browser asks before unloading a changed scene in Create", async () => {
+    const { editor } = setup();
+    const unload = (): boolean => {
+      const event = new Event("beforeunload", { cancelable: true });
+      dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    fireEvent.click(screen.getByRole("button", { name: "Start from blank" }));
+    expect(unload()).toBe(false);
+    editor.newSeed();
+    await vi.waitFor(() => {
+      expect(unload()).toBe(true);
+    });
+    editor.markSaved({ withAssets: true });
+    await vi.waitFor(() => {
+      expect(unload()).toBe(false);
+    });
+    editor.newSeed();
+    fireEvent.click(screen.getByRole("button", { name: "Gallery" }));
+    fireEvent.click(screen.getByRole("button", { name: "Go to gallery" }));
+    expect(unload()).toBe(false);
+  });
+
   test("a shared or saved scene no longer counts as changed", () => {
     const { editor } = setup();
     fireEvent.click(screen.getByRole("button", { name: "Start from blank" }));
