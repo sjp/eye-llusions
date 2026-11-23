@@ -218,6 +218,50 @@ describe("renderStereogram", () => {
     expect(out.subarray(WIDTH * 8).every((value) => value === 0)).toBe(true);
   });
 
+  test("finds the same hidden points with or without the prefilter", () => {
+    const rows = 6;
+    let state = 7;
+    const random = (): number => {
+      state = (Math.imul(state, 1103515245) + 12345) >>> 0;
+      return state / 2 ** 32;
+    };
+    const scenes: Record<string, (x: number, y: number) => number> = {
+      specks: () => 0,
+      dome: (x, y) => Math.max(0, 1 - ((x - 200) / 120) ** 2 - ((y - 3) / 4) ** 2),
+      steps: (x) => Math.floor(x / 50) / 8,
+      noise: () => random(),
+      boxes: (x, y) => (x % 130 < 40 + y * 5 ? 0.9 : 0.2),
+    };
+    for (const [name, at] of Object.entries(scenes)) {
+      const depth = new Float32Array(WIDTH * rows);
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < WIDTH; x++) {
+          depth[y * WIDTH + x] = at(x, y);
+        }
+      }
+      if (name === "specks") {
+        for (let y = 0; y < rows; y++) {
+          depth[y * WIDTH + Math.floor(random() * WIDTH)] = 1;
+        }
+      }
+      for (const [mode, repeats, depthOfField] of [
+        ["wall", 8, 1 / 3],
+        ["wall", 8, 0.9],
+        ["wall", 2, 0.9],
+        ["wall", 12, 0.05],
+        ["cross", 8, 1 / 3],
+        ["cross", 3, 0.5],
+      ] as const) {
+        for (const oversample of [1, 2]) {
+          const options = { height: rows, mode, repeats, depthOfField, oversample };
+          const scan = render(depth, { ...options, hiddenSurface: "scan" });
+          expect(render(depth, { ...options, hiddenSurface: "prefilter" })).toEqual(scan);
+          expect(render(depth, { ...options, hiddenSurface: "auto" })).toEqual(scan);
+        }
+      }
+    }
+  });
+
   test("rejects inconsistent sizes", () => {
     expect(() => render(flat(0), { startRow: 2, endRow: 1 })).toThrow(RangeError);
     expect(() => render(flat(0), { endRow: HEIGHT + 1 })).toThrow(RangeError);

@@ -29,11 +29,63 @@ export type StereogramOptions = {
    */
   startRow?: number;
   endRow?: number;
+  /**
+   * How hidden points are found. `scan` steps along each sight line; `prefilter` first
+   * rules out, per row, the points no sight line could be blocked from; `auto`, the
+   * default, prefilters rows where scanning would be slow. All give the same pixels.
+   */
+  hiddenSurface?: "auto" | "scan" | "prefilter";
 };
+
+/**
+ * Prefilter a row when scanning would take about this many steps per point, assuming
+ * each scan runs from the row's mean height up to its highest point.
+ */
+const PREFILTER_STEPS = 4;
+
+/** Slack for rounding in the prefilter, far above the error of summing steps. */
+const PREFILTER_SLACK = 1e-6;
 
 function assertPositiveInteger(name: string, value: number): void {
   if (!Number.isInteger(value) || value < 1) {
     throw new RangeError(`${name} must be a positive integer, got ${String(value)}`);
+  }
+}
+
+/**
+ * Sets `lower[x]` and `upper[x]` to the most `rise[x ± t] − t·step` for any `t ≥ 1`,
+ * with `step` at `lowStep` and `highStep`: how far the surface beside `x` rises above
+ * lines climbing away from it at those rates per pixel.
+ */
+function reachOver(
+  rise: Float32Array,
+  lowStep: number,
+  highStep: number,
+  lower: Float64Array,
+  upper: Float64Array,
+): void {
+  const w = rise.length;
+  let low = -Infinity;
+  let high = -Infinity;
+  for (let x = 0; x < w; x++) {
+    lower[x] = low;
+    upper[x] = high;
+    const r = rise[x];
+    low = (low > r ? low : r) - lowStep;
+    high = (high > r ? high : r) - highStep;
+  }
+  low = -Infinity;
+  high = -Infinity;
+  for (let x = w - 1; x >= 0; x--) {
+    if (low > lower[x]) {
+      lower[x] = low;
+    }
+    if (high > upper[x]) {
+      upper[x] = high;
+    }
+    const r = rise[x];
+    low = (low > r ? low : r) - lowStep;
+    high = (high > r ? high : r) - highStep;
   }
 }
 
@@ -59,7 +111,7 @@ export function renderStereogram(options: StereogramOptions): Uint8ClampedArray 
   if (out.length !== width * height * 4) {
     throw new RangeError(`out must hold ${String(width * height * 4)} bytes`);
   }
-  const { startRow = 0, endRow = height } = options;
+  const { startRow = 0, endRow = height, hiddenSurface = "auto" } = options;
   if (!Number.isInteger(startRow) || !Number.isInteger(endRow)) {
     throw new RangeError("startRow and endRow must be integers");
   }
@@ -83,10 +135,17 @@ export function renderStereogram(options: StereogramOptions): Uint8ClampedArray 
   const rise = cross ? new Float32Array(w) : z;
   const same = new Int32Array(w);
   const colour = new Uint32Array(w);
+  // How far the surface rises above each point's sight lines at their shallowest
+  // (`lower`) and steepest (`upper`) climb: a point above `lower` can't be hidden, and
+  // one below `upper` must be. Rounding is far below the slack allowed for it.
+  let lower: Float64Array | undefined;
+  let upper: Float64Array | undefined;
 
   for (let y = startRow; y < endRow; y++) {
     const rowStart = y * width;
     let rowMax = 0;
+    let rowMin = Infinity;
+    let rowSum = 0;
     for (let x = 0; x < w; x++) {
       const source = (x + 0.5) / oversample - 0.5;
       const i0 = source <= 0 ? 0 : Math.floor(source);
@@ -104,7 +163,25 @@ export function renderStereogram(options: StereogramOptions): Uint8ClampedArray 
       if (rise[x] > rowMax) {
         rowMax = rise[x];
       }
+      if (rise[x] < rowMin) {
+        rowMin = rise[x];
+      }
+      rowSum += rise[x];
       same[x] = x;
+    }
+
+    // Sight lines climb less steeply from higher points.
+    const minStep = cross ? (1 - rowMax) * crossStep : (2 - mu * rowMax) * wallStep;
+    const maxStep = cross ? (1 - rowMin) * crossStep : (2 - mu * rowMin) * wallStep;
+    let rowLower: Float64Array | undefined;
+    let rowUpper: Float64Array | undefined;
+    if (
+      hiddenSurface === "prefilter" ||
+      (hiddenSurface === "auto" && rowMax - rowSum / w > PREFILTER_STEPS * minStep)
+    ) {
+      rowLower = lower ??= new Float64Array(w);
+      rowUpper = upper ??= new Float64Array(w);
+      reachOver(rise, minStep, maxStep, rowLower, rowUpper);
     }
 
     for (let x = 0; x < w; x++) {
@@ -117,19 +194,28 @@ export function renderStereogram(options: StereogramOptions): Uint8ClampedArray 
       }
       // A point is hidden if the surface rises above either eye's line of sight to it.
       const hx = rise[x];
-      const step = cross ? (1 - hx) * crossStep : (2 - mu * hx) * wallStep;
-      const limit = rowMax < 1 ? rowMax : 1;
-      let visible = true;
-      for (let t = 1, ht = hx + step; ht <= limit; t++, ht += step) {
-        const a = x - t;
-        const b = x + t;
-        if ((a >= 0 && rise[a] >= ht) || (b < w && rise[b] >= ht)) {
-          visible = false;
-          break;
+      let scan = true;
+      if (rowLower !== undefined && rowUpper !== undefined) {
+        if (rowUpper[x] - PREFILTER_SLACK > hx) {
+          continue;
         }
+        // The lowest points climb at exactly maxStep, so `upper` settles them both ways.
+        scan = (hx === rowMin ? rowUpper[x] : rowLower[x]) + PREFILTER_SLACK >= hx;
       }
-      if (!visible) {
-        continue;
+      if (scan) {
+        const step = cross ? (1 - hx) * crossStep : (2 - mu * hx) * wallStep;
+        let visible = true;
+        for (let t = 1, ht = hx + step; ht <= rowMax; t++, ht += step) {
+          const a = x - t;
+          const b = x + t;
+          if ((a >= 0 && rise[a] >= ht) || (b < w && rise[b] >= ht)) {
+            visible = false;
+            break;
+          }
+        }
+        if (!visible) {
+          continue;
+        }
       }
       for (let k = same[left]; k !== left && k !== right; k = same[left]) {
         if (k < right) {

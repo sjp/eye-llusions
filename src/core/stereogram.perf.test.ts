@@ -45,3 +45,35 @@ test("renders a 2000×1200 stereogram well within a frame budget", () => {
   const median = times.toSorted((a, b) => a - b)[2];
   expect(median, `median ${median.toFixed(1)} ms`).toBeLessThan(300);
 });
+
+test("renders a 3840×2160 near speck on every row, at a deep field, within a budget", () => {
+  const width = 3840;
+  const height = 2160;
+  const depth = new Float32Array(width * height);
+  for (let y = 0; y < height; y++) {
+    depth[y * width + (((y * 2654435761) >>> 0) % width)] = 1;
+  }
+  const out = new Uint8ClampedArray(width * height * 4);
+  const times: number[] = [];
+  for (const [mode, repeats, depthOfField] of [
+    ["wall", 2, 0.9],
+    ["wall", 8, 0.9],
+    ["cross", 3, 0.5],
+  ] as const) {
+    const start = performance.now();
+    renderStereogram({
+      depth,
+      width,
+      height,
+      repeats,
+      depthOfField,
+      mode,
+      oversample: 1,
+      sample: (x, y) => ((Math.imul(Math.floor(x), 0x9e3779b1) ^ y) | 0xff) >>> 0,
+      out,
+    });
+    times.push(performance.now() - start);
+  }
+  const slowest = Math.max(...times);
+  expect(slowest, `slowest ${slowest.toFixed(1)} ms`).toBeLessThan(600);
+});
