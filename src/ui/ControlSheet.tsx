@@ -63,6 +63,10 @@ export function ControlSheet({ snap, onSnap, children }: Props) {
     if (current.moved) {
       onSnap(nearestSnap(sheet.getBoundingClientRect().height, screenHeight(sheet)));
     }
+    // A release is followed by a click, which checks the drag; a cancel never is.
+    if (event.type === "pointercancel") {
+      drag.current = undefined;
+    }
     sheet.style.removeProperty("--sheet-drag");
     setDragging(false);
   };

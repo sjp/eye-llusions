@@ -126,6 +126,17 @@ describe("App", () => {
     expect(handle.getAttribute("aria-expanded")).toBe("false");
   });
 
+  test("a cancelled drag on the sheet handle doesn't swallow the next press", () => {
+    setup();
+    const handle = screen.getByRole("button", { name: "Controls" });
+    fireEvent.pointerDown(handle, { pointerId: 1, button: 0, clientY: 500 });
+    fireEvent.pointerMove(handle, { pointerId: 1, clientY: 400 });
+    fireEvent.pointerCancel(handle, { pointerId: 1 });
+    const expanded = handle.getAttribute("aria-expanded");
+    fireEvent.click(handle);
+    expect(handle.getAttribute("aria-expanded")).not.toBe(expanded);
+  });
+
   test("View opens the viewer and going back closes it", async () => {
     setup();
     fireEvent.click(screen.getByRole("button", { name: "View" }));
