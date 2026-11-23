@@ -125,9 +125,18 @@ export async function decodeRecipe(payload: string): Promise<Recipe> {
   }
 }
 
-/** The payload of a `#r=` fragment, or undefined when the hash isn't a share link. */
+/**
+ * The payload of a `#r=` fragment, or undefined when the hash isn't a share link.
+ * Base64url never holds characters such as `.`, `)` or `&`, so anything from the first
+ * of them after the version is dropped, like the punctuation or tracking parameters
+ * that chat apps add to links.
+ */
 export function linkPayload(hash: string): string | undefined {
-  return hash.startsWith(HASH_PREFIX) ? hash.slice(HASH_PREFIX.length) : undefined;
+  if (!hash.startsWith(HASH_PREFIX)) {
+    return undefined;
+  }
+  const payload = hash.slice(HASH_PREFIX.length);
+  return /^\d+\.[\w-]+/.exec(payload)?.[0] ?? payload;
 }
 
 /** `href` with its fragment replaced by the share link for `payload`. */

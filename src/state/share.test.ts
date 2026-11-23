@@ -113,4 +113,15 @@ describe("share links", () => {
     expect(linkPayload("#other")).toBeUndefined();
     expect(linkPayload("")).toBeUndefined();
   });
+
+  test.each([".", ")", "),", "...", "&utm_source=chat", "?ref=x", "%29", " see you"])(
+    "ignore %j that chat apps add after a link",
+    async (junk) => {
+      const recipe = defaultRecipe();
+      const payload = await encodeRecipe(recipe);
+      const hash = new URL(`${shareUrl("https://example.com/", payload)}${junk}`).hash;
+      expect(linkPayload(hash)).toBe(payload);
+      expect(await decodeRecipe(linkPayload(hash) ?? "")).toEqual(recipe);
+    },
+  );
 });
