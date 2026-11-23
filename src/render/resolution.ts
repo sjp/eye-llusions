@@ -4,6 +4,9 @@ export const PREVIEW_MAX_PIXELS = 4_000_000;
 /** Linear scale of a draft render relative to the full preview. */
 export const DRAFT_SCALE = 0.5;
 
+/** Horizontal supersampling of an exported image. */
+export const EXPORT_OVERSAMPLE = 4;
+
 /** Quiet time after the last change before a full render replaces the draft. */
 export const SETTLE_DELAY_MS = 150;
 

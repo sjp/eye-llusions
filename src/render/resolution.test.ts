@@ -1,8 +1,10 @@
 import { describe, expect, test, vi } from "vitest";
+import { renderStereogram } from "../core/stereogram.ts";
 import {
   createPreviewScheduler,
   EXPORT_MAX_PIXELS,
   EXPORT_MIN_WIDTH,
+  EXPORT_OVERSAMPLE,
   EXPORT_PRESETS,
   exportSizeForWidth,
   maxExportWidth,
@@ -118,5 +120,42 @@ describe("export sizes", () => {
       expect(size.width * size.height).toBeLessThanOrEqual(EXPORT_MAX_PIXELS);
     }
     expect(exportSizeForWidth(0.2, 64).height).toBe(320);
+  });
+});
+
+describe("EXPORT_OVERSAMPLE", () => {
+  /**
+   * Distinct link distances in a ramp from far to near, one depth per row. A flat row
+   * links every pixel, so it takes one sample per pixel group: as many as its link
+   * distance.
+   */
+  function linkDistances(oversample: number): number {
+    const width = 1920;
+    const height = 256;
+    const depth = new Float32Array(width * height);
+    for (let y = 0; y < height; y++) {
+      depth.fill(y / (height - 1), y * width, (y + 1) * width);
+    }
+    const samples = Array.from({ length: height }, () => 0);
+    renderStereogram({
+      depth,
+      width,
+      height,
+      repeats: 8,
+      depthOfField: 1 / 3,
+      mode: "wall",
+      oversample,
+      sample: (_x, y) => {
+        samples[y]++;
+        return 0xff;
+      },
+    });
+    return new Set(samples).size;
+  }
+
+  test("gives a ramp several times as many depth steps as whole pixels do", () => {
+    const whole = linkDistances(1);
+    expect(whole).toBe(49);
+    expect(linkDistances(EXPORT_OVERSAMPLE)).toBeGreaterThanOrEqual(whole * 3);
   });
 });

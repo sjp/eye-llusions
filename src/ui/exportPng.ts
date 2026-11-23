@@ -1,5 +1,6 @@
 import type { Recipe } from "../core/recipe.ts";
 import { RenderClient, type RenderImage } from "../render/client.ts";
+import { EXPORT_OVERSAMPLE } from "../render/resolution.ts";
 import { embedProject } from "../state/projectFile.ts";
 
 type Size = { width: number; height: number };
@@ -57,7 +58,7 @@ export const renderPng: ExportPng = async (recipe, size, signal) => {
   signal?.addEventListener("abort", stop);
   let image: RenderImage;
   try {
-    image = await client.render(recipe, size);
+    image = await client.render(recipe, size, { oversample: EXPORT_OVERSAMPLE });
   } finally {
     signal?.removeEventListener("abort", stop);
     client.dispose();
