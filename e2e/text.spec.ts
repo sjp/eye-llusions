@@ -1,4 +1,4 @@
-import { chromium, devices, webkit, type Page } from "@playwright/test";
+import { chromium, devices, firefox, webkit, type Page } from "@playwright/test";
 import { expect, test, watchContext } from "./guard.ts";
 import { layerNames, openLayers, renders, settledPixels } from "./preview.ts";
 import { renderInWorker, workerUrl } from "./worker.ts";
@@ -128,6 +128,7 @@ test("text renders the same in desktop and mobile browsers", async ({ page }, te
   for (const [engine, device] of [
     [chromium, devices["Pixel 7"]],
     [webkit, devices["iPhone 15"]],
+    [firefox, devices["Desktop Firefox"]],
   ] as const) {
     const browser = await engine.launch();
     try {
@@ -148,7 +149,7 @@ test("text renders the same in desktop and mobile browsers", async ({ page }, te
       if (engine === chromium) {
         expect(largest, summary).toBe(0);
       } else {
-        // WebKit anti-aliases glyph outlines slightly differently.
+        // WebKit and Firefox anti-alias glyph outlines slightly differently.
         expect(mean, summary).toBeLessThan(1);
         expect(largest, summary).toBeLessThanOrEqual(64);
       }
