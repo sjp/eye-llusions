@@ -125,6 +125,25 @@ test("a two-finger gesture zooms without adding a stroke", async ({ page }) => {
   await expect(reset).toBeHidden();
 });
 
+test("the zoom buttons zoom the picture in and out", async ({ page }) => {
+  const { surface } = await openDrawing(page);
+  const width = async () => (await surface.boundingBox())?.width ?? 0;
+  const original = await width();
+  const zoomIn = page.getByRole("button", { name: "Zoom in" });
+  const zoomOut = page.getByRole("button", { name: "Zoom out" });
+  await expect(zoomOut).toBeDisabled();
+  await zoomIn.click();
+  await zoomIn.click();
+  await expect.poll(width).toBeCloseTo(original * 2.25, 0);
+  await expect(page.getByRole("button", { name: "Reset zoom" })).toBeVisible();
+  await zoomOut.click();
+  await expect.poll(width).toBeCloseTo(original * 1.5, 0);
+  await zoomOut.click();
+  await expect(zoomOut).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Reset zoom" })).toBeHidden();
+  await expect(surface).toHaveAttribute("data-strokes", "0");
+});
+
 test("real touches draw with one finger and zoom with two", async ({
   page,
   browserName,

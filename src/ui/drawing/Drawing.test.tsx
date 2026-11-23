@@ -120,6 +120,20 @@ describe("drawing on the preview", () => {
     expect(preview?.style.transform).toBe("translate(0px, 0px) scale(1)");
   });
 
+  test("the zoom buttons zoom in and back out", () => {
+    setup();
+    const preview = document.querySelector<HTMLElement>(".preview-surface");
+    const zoomOut = screen.getByRole<HTMLButtonElement>("button", { name: "Zoom out" });
+    expect(zoomOut.disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    expect(preview?.style.transform).toBe("translate(0px, 0px) scale(1.5)");
+    expect(screen.getByRole("button", { name: "Reset zoom" })).toBeTruthy();
+    fireEvent.click(zoomOut);
+    expect(preview?.style.transform).toBe("translate(0px, 0px) scale(1)");
+    expect(zoomOut.disabled).toBe(true);
+    expect(screen.queryByRole("button", { name: "Reset zoom" })).toBeNull();
+  });
+
   test("a palm resting while the pen draws is ignored", () => {
     const editor = setup();
     const pen = { pointerId: 1, pointerType: "pen" };

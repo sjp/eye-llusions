@@ -58,6 +58,24 @@ export function moveGrip(
   );
 }
 
+/**
+ * The view zoomed by `factor` about the centre of the preview, which keeps its place on
+ * the picture. Zooming all the way out also undoes any panning.
+ */
+export function zoomBy(view: ViewTransform, factor: number): ViewTransform {
+  const scale = Math.min(MAX_SCALE, Math.max(1, view.scale * factor));
+  if (scale === 1) {
+    return IDENTITY;
+  }
+  const ratio = scale / view.scale;
+  return { scale, x: view.x * ratio, y: view.y * ratio };
+}
+
+/** Whether the view can zoom in further. */
+export function canZoomIn(view: ViewTransform): boolean {
+  return view.scale < MAX_SCALE;
+}
+
 /** The grip of one or two pointers. */
 export function gripOf(points: readonly Vector[]): Grip {
   const [a, b] = points;

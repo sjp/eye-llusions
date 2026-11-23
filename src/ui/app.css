@@ -356,6 +356,11 @@ h2 {
   gap: 8px;
 }
 
+.stage-zoom {
+  display: flex;
+  gap: 4px;
+}
+
 .stage-bar .segmented legend {
   position: absolute;
   width: 1px;

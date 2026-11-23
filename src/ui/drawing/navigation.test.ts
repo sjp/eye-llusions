@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { cssTransform, gripOf, IDENTITY, moveGrip } from "./navigation.ts";
+import { canZoomIn, cssTransform, gripOf, IDENTITY, moveGrip, zoomBy } from "./navigation.ts";
 
 const surface = { centre: { x: 200, y: 150 }, width: 400, height: 300 };
 
@@ -44,6 +44,19 @@ describe("navigation", () => {
       gripOf([{ x: 5000, y: -5000 }]),
     );
     expect(far).toEqual({ scale: 1, x: 200, y: -150 });
+  });
+
+  test("buttons zoom about the centre, between 1 and 8", () => {
+    const view = zoomBy({ scale: 2, x: 30, y: -10 }, 2);
+    expect(view).toEqual({ scale: 4, x: 60, y: -20 });
+    // The picture point under the centre stays there.
+    expect(onScreen(view, -15, 5)).toEqual(surface.centre);
+    expect(zoomBy(view, 0.5)).toEqual({ scale: 2, x: 30, y: -10 });
+    expect(zoomBy(view, 100).scale).toBe(8);
+    expect(canZoomIn(zoomBy(view, 100))).toBe(false);
+    expect(canZoomIn(view)).toBe(true);
+    // All the way out is the unzoomed, unpanned view.
+    expect(zoomBy({ scale: 1.2, x: 30, y: 0 }, 0.5)).toBe(IDENTITY);
   });
 
   test("formats a CSS transform", () => {

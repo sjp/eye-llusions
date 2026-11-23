@@ -5,7 +5,7 @@ import type { RenderOutput } from "../render/protocol.ts";
 import type { Editor } from "../state/editor.ts";
 import { selectedLayer } from "../state/layers.ts";
 import { DrawingSurface } from "./drawing/DrawingSurface.tsx";
-import { cssTransform, IDENTITY } from "./drawing/navigation.ts";
+import { canZoomIn, cssTransform, IDENTITY, zoomBy } from "./drawing/navigation.ts";
 import type { DrawingTool, DrawingTools } from "./drawing/tools.ts";
 import { Preview, type Renderer } from "./Preview.tsx";
 import { Segmented } from "./Segmented.tsx";
@@ -19,6 +19,9 @@ const TOOLS: readonly { value: DrawingTool; label: string }[] = [
   { value: "draw", label: "Draw" },
   { value: "move", label: "Move" },
 ];
+
+/** How much each zoom button press zooms in or out. */
+const ZOOM_STEP = 1.5;
 
 type Props = {
   editor: Editor;
@@ -72,6 +75,34 @@ export function Stage({ editor, renderer, selection, tools }: Props) {
               tools.tool.value = tool;
             }}
           />
+        ) : null}
+        {drawing ? (
+          <div class="stage-zoom" role="group" aria-label="Zoom">
+            <button
+              type="button"
+              class="button"
+              aria-label="Zoom out"
+              title="Zoom out"
+              disabled={!zoomed}
+              onClick={() => {
+                view.value = zoomBy(view.value, 1 / ZOOM_STEP);
+              }}
+            >
+              −
+            </button>
+            <button
+              type="button"
+              class="button"
+              aria-label="Zoom in"
+              title="Zoom in"
+              disabled={!canZoomIn(view.value)}
+              onClick={() => {
+                view.value = zoomBy(view.value, ZOOM_STEP);
+              }}
+            >
+              +
+            </button>
+          </div>
         ) : null}
         {drawing && zoomed ? (
           <button
