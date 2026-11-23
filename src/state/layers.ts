@@ -55,10 +55,46 @@ export function insertLayer(layers: Layer[], layer: Layer, above?: string): Laye
   return [...layers.slice(0, at), layer, ...layers.slice(at)];
 }
 
-/** A copy of the layer with ID `id`, with a fresh ID and name, inserted above it. */
+/** How many drawn points `layer` holds. */
+function layerPoints(layer: Layer): number {
+  if (layer.kind !== "drawing") {
+    return 0;
+  }
+  let points = 0;
+  for (const stroke of layer.strokes) {
+    points += stroke.points.length / 2;
+  }
+  return points;
+}
+
+function totalPoints(layers: readonly Layer[]): number {
+  let points = 0;
+  for (const layer of layers) {
+    points += layerPoints(layer);
+  }
+  return points;
+}
+
+/**
+ * Whether a copy of the layer with ID `id` fits in the stack: there is room for another
+ * layer, and the copy's drawn points stay within the recipe's total.
+ */
+export function canDuplicateLayer(layers: readonly Layer[], id: string): boolean {
+  const original = layers.find((layer) => layer.id === id);
+  return (
+    original !== undefined &&
+    canAddLayer(layers) &&
+    totalPoints(layers) + layerPoints(original) <= RECIPE_LIMITS.pointsTotal
+  );
+}
+
+/**
+ * A copy of the layer with ID `id`, with a fresh ID and name, inserted above it. Returns
+ * `layers` unchanged when the copy wouldn't fit.
+ */
 export function duplicateLayer(layers: Layer[], id: string): Layer[] {
   const original = layers.find((layer) => layer.id === id);
-  if (original === undefined) {
+  if (original === undefined || !canDuplicateLayer(layers, id)) {
     return layers;
   }
   const copy: Layer = {
@@ -100,18 +136,9 @@ export function selectedLayer(layers: readonly Layer[], id: string | undefined):
  * caps: 0 when the layer has its most strokes.
  */
 export function strokeRoom(layers: readonly Layer[], id: string): number {
-  let points = 0;
-  let strokes = 0;
-  for (const layer of layers) {
-    if (layer.kind === "drawing") {
-      for (const stroke of layer.strokes) {
-        points += stroke.points.length / 2;
-      }
-      if (layer.id === id) {
-        strokes = layer.strokes.length;
-      }
-    }
-  }
+  const points = totalPoints(layers);
+  const layer = layers.find((each) => each.id === id);
+  const strokes = layer?.kind === "drawing" ? layer.strokes.length : 0;
   return strokes >= RECIPE_LIMITS.strokesPerLayer
     ? 0
     : Math.max(0, Math.min(RECIPE_LIMITS.pointsPerStroke, RECIPE_LIMITS.pointsTotal - points));

@@ -154,6 +154,28 @@ describe("LayersPanel", () => {
     expect(screen.getByText(/up to 32 layers/)).toBeTruthy();
   });
 
+  test("won't duplicate a drawing whose copy has too many points", () => {
+    const stroke = {
+      brush: { size: 0.1, softness: 0, mode: "set" as const, value: 1 },
+      points: Array.from({ length: RECIPE_LIMITS.pointsPerStroke * 2 }, () => 0.5),
+    };
+    const drawing: Layer = {
+      kind: "drawing",
+      id: "drawing-1",
+      name: "Drawing",
+      visible: true,
+      blend: "max",
+      depth: 1,
+      strokes: Array.from({ length: 7 }, () => stroke),
+    };
+    setup([drawing]);
+    const duplicate = screen.getByRole<HTMLButtonElement>("button", { name: "Duplicate" });
+    expect(duplicate.disabled).toBe(true);
+    expect(duplicate.getAttribute("aria-describedby")).toBe(
+      screen.getByText(/limit of 50,000 drawn points/).id,
+    );
+  });
+
   test("an empty stack offers only adding", () => {
     const editor = setup([]);
     expect(screen.queryByRole("list")).toBeNull();

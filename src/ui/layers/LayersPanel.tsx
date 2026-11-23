@@ -5,6 +5,7 @@ import type { Asset, Layer } from "../../core/recipe.ts";
 import type { Editor } from "../../state/editor.ts";
 import {
   canAddLayer,
+  canDuplicateLayer,
   changeLayer,
   duplicateLayer,
   insertLayer,
@@ -18,6 +19,8 @@ import { Slider } from "../Slider.tsx";
 import { LAYER_KINDS, type LayerKind } from "./kinds.ts";
 
 type BlendMode = Layer["blend"];
+
+const POINTS_TOTAL = new Intl.NumberFormat("en").format(RECIPE_LIMITS.pointsTotal);
 
 const BLEND_MODES: readonly { value: BlendMode; label: string }[] = [
   { value: "max", label: "Nearest wins" },
@@ -257,6 +260,10 @@ export function LayersPanel({
   const [over, setOver] = useState<string | undefined>(undefined);
   const selected = selectedLayer(layers, selectedId);
   const roomy = canAddLayer(layers);
+  const duplicable = selected !== undefined && canDuplicateLayer(layers, selected.id);
+  const duplicateNoteId = useId();
+  // Without room for a layer, the note under the add buttons already explains why.
+  const tooManyPoints = selected !== undefined && roomy && !duplicable;
 
   const add = (kind: AddableKind): void => {
     const layer = withFreeIdentity(layers, kind.create(editor.recipe.value));
@@ -344,7 +351,8 @@ export function LayersPanel({
             <button
               type="button"
               class="button"
-              disabled={!roomy}
+              disabled={!duplicable}
+              aria-describedby={tooManyPoints ? duplicateNoteId : undefined}
               onClick={() => {
                 const before = new Set(layers.map((layer) => layer.id));
                 editor.updateLayers((current) => duplicateLayer(current, selected.id));
@@ -368,6 +376,11 @@ export function LayersPanel({
               Delete
             </button>
           </div>
+          {tooManyPoints && (
+            <p class="panel-note" id={duplicateNoteId}>
+              A copy would pass the limit of {POINTS_TOTAL} drawn points in a picture.
+            </p>
+          )}
           <LayerSettings key={selected.id} editor={editor} layer={selected} />
         </>
       )}

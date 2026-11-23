@@ -4,6 +4,7 @@ import { defaultRecipe, type DrawingLayer, type Layer, type Stroke } from "../co
 import {
   addStroke,
   canAddLayer,
+  canDuplicateLayer,
   changeLayer,
   duplicateLayer,
   freeLayerId,
@@ -132,5 +133,21 @@ describe("selection and strokes", () => {
       Array.from({ length: RECIPE_LIMITS.strokesPerLayer }, () => strokeOf(1)),
     );
     expect(strokeRoom([full], "d")).toBe(0);
+  });
+
+  test("won't duplicate a drawing past the recipe's point total", () => {
+    const strokes = Array.from({ length: 7 }, () => strokeOf(4000));
+    const layers: Layer[] = [drawing("d", strokes), layer("a")];
+    expect(canDuplicateLayer(layers, "d")).toBe(false);
+    expect(duplicateLayer(layers, "d")).toBe(layers);
+    expect(canDuplicateLayer(layers, "a")).toBe(true);
+    expect(canDuplicateLayer(layers, "missing")).toBe(false);
+
+    const exact: Layer[] = [drawing("d", strokes.slice(0, 6)), drawing("e", [strokeOf(2000)])];
+    expect(canDuplicateLayer(exact, "d")).toBe(true);
+    expect(duplicateLayer(exact, "d")).toHaveLength(3);
+    const over: Layer[] = [drawing("d", strokes.slice(0, 6)), drawing("e", [strokeOf(2001)])];
+    expect(canDuplicateLayer(over, "d")).toBe(false);
+    expect(canDuplicateLayer(over, "e")).toBe(true);
   });
 });
