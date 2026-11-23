@@ -96,6 +96,16 @@ describe("PNG chunks", () => {
   });
 });
 
+function concat(...parts: Uint8Array[]): Uint8Array {
+  const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.length;
+  }
+  return out;
+}
+
 describe("iTXt", () => {
   test("lays out the fields as the PNG specification does", () => {
     const chunk = encodeITxt({
@@ -149,6 +159,13 @@ describe("iTXt", () => {
     ["an unknown method", Uint8Array.of(0x41, 0, 1, 1, 0, 0)],
     ["an unknown flag", Uint8Array.of(0x41, 0, 2, 0, 0, 0)],
     ["an unterminated language", Uint8Array.of(0x41, 0, 0, 0, 0x65)],
+    ["an empty keyword", Uint8Array.of(0, 0, 0, 0, 0)],
+    ["an 80-byte keyword", concat(ascii("k".repeat(80)), Uint8Array.of(0, 0, 0, 0, 0))],
+    ["a huge keyword", concat(new Uint8Array(300_000).fill(0x6b), Uint8Array.of(0, 0, 0, 0, 0))],
+    [
+      "a huge language",
+      concat(Uint8Array.of(0x41, 0, 0, 0), new Uint8Array(300_000).fill(0x65), Uint8Array.of(0, 0)),
+    ],
   ])("rejects %s", (_name, data) => {
     expect(() => decodeITxt({ type: "iTXt", data })).toThrow(PngError);
   });

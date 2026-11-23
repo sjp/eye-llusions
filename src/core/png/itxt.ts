@@ -19,12 +19,23 @@ function latin1(text: string): Uint8Array {
   return Uint8Array.from(text, (char) => char.codePointAt(0) ?? 0);
 }
 
+/** Longest keyword, and the longest language tag this reader accepts, in bytes. */
+const MAX_FIELD = 79;
+
 function nullAt(bytes: Uint8Array, from: number): number {
   const index = bytes.indexOf(0, from);
   if (index === -1) {
     throw new PngError("iTXt field isn't terminated");
   }
   return index;
+}
+
+function latin1Text(bytes: Uint8Array): string {
+  let text = "";
+  for (const byte of bytes) {
+    text += String.fromCodePoint(byte);
+  }
+  return text;
 }
 
 export function encodeITxt({
@@ -63,6 +74,9 @@ export function decodeITxt(chunk: PngChunk): InternationalText {
     throw new PngError("not an iTXt chunk");
   }
   const keywordEnd = nullAt(data, 0);
+  if (keywordEnd < 1 || keywordEnd > MAX_FIELD) {
+    throw new PngError("iTXt keyword must be 1 to 79 bytes");
+  }
   if (keywordEnd + 2 >= data.length) {
     throw new PngError("iTXt chunk is truncated");
   }
@@ -72,8 +86,10 @@ export function decodeITxt(chunk: PngChunk): InternationalText {
     throw new PngError("unknown iTXt compression");
   }
   const languageEnd = nullAt(data, keywordEnd + 3);
+  if (languageEnd - (keywordEnd + 3) > MAX_FIELD) {
+    throw new PngError("iTXt language tag is too long");
+  }
   const translatedEnd = nullAt(data, languageEnd + 1);
-  const latin1Text = (bytes: Uint8Array): string => String.fromCodePoint(...bytes);
   return {
     keyword: latin1Text(data.subarray(0, keywordEnd)),
     compressed: flag === 1,
