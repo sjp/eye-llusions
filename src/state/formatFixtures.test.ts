@@ -3,7 +3,8 @@ import { readChunks, writeChunks } from "../core/png/chunks.ts";
 import { decodeITxt } from "../core/png/itxt.ts";
 import type { Recipe } from "../core/recipe.ts";
 import { decompress, fromBase64Url } from "./bytes.ts";
-import projectPng from "./fixtures/project-v1.png?inline";
+import projectV1Png from "./fixtures/project-v1.png?inline";
+import projectV2Png from "./fixtures/project-v2.png?inline";
 import { embedProject, readProject } from "./projectFile.ts";
 import { decodeRecipe, encodeRecipe } from "./share.ts";
 
@@ -332,25 +333,31 @@ const PROJECT: Recipe = {
   },
 };
 
-function projectBytes(): Uint8Array<ArrayBuffer> {
-  const base64 = projectPng.slice(projectPng.indexOf(",") + 1);
+function projectBytes(dataUrl: string): Uint8Array<ArrayBuffer> {
+  const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
   return Uint8Array.from(atob(base64), (char) => char.codePointAt(0) ?? 0);
 }
 
-/** The project embedded in a PNG, with each asset's compressed data left out. */
-async function projectJson(png: Uint8Array): Promise<unknown> {
-  const chunk = readChunks(png).find((each) => each.type === "iTXt");
-  if (chunk === undefined) {
+/**
+ * The project embedded in a PNG, with each asset's pixels inflated but not unfiltered,
+ * since deflate's output may differ between platforms while its input can't.
+ */
+async function projectContents(png: Uint8Array): Promise<unknown> {
+  const chunks = readChunks(png);
+  const text = chunks.find((each) => each.type === "iTXt");
+  if (text === undefined) {
     throw new Error("no iTXt chunk");
   }
-  const json = await decompress(new Uint8Array(decodeITxt(chunk).text), "deflate", 1024 * 1024);
-  const project = JSON.parse(new TextDecoder().decode(json)) as {
-    assets: Record<string, { data?: string }>;
-  };
-  for (const asset of Object.values(project.assets)) {
-    delete asset.data;
+  const json = await decompress(new Uint8Array(decodeITxt(text).text), "deflate", 1024 * 1024);
+  const assets: Record<string, number[]> = {};
+  for (const chunk of chunks.filter((each) => each.type === "eyAs")) {
+    const end = chunk.data.indexOf(0);
+    const id = new TextDecoder().decode(chunk.data.subarray(0, end));
+    const pixels = await decompress(new Uint8Array(chunk.data.subarray(end + 1)), "deflate-raw");
+    assets[id] = [...pixels];
   }
-  return project;
+  const project: unknown = JSON.parse(new TextDecoder().decode(json));
+  return { project, assets };
 }
 
 describe("share links from earlier releases", () => {
@@ -367,14 +374,19 @@ describe("share links from earlier releases", () => {
 });
 
 describe("project files from earlier releases", () => {
-  test("open as the scene they were saved from", async () => {
-    expect(await readProject(projectBytes())).toEqual(PROJECT);
+  test.each([
+    ["1", projectV1Png],
+    ["2", projectV2Png],
+  ])("format %s opens as the scene it was saved from", async (_, png) => {
+    expect(await readProject(projectBytes(png))).toEqual(PROJECT);
   });
 
-  test("are still how the scene is written", async () => {
-    const original = projectBytes();
-    const image = readChunks(original).filter((chunk) => chunk.type !== "iTXt");
+  test("format 2 is still how the scene is written", async () => {
+    const original = projectBytes(projectV2Png);
+    const image = readChunks(original).filter(
+      (chunk) => chunk.type !== "iTXt" && chunk.type !== "eyAs",
+    );
     const fresh = await embedProject(writeChunks(image), PROJECT);
-    expect(await projectJson(fresh)).toEqual(await projectJson(original));
+    expect(await projectContents(fresh)).toEqual(await projectContents(original));
   });
 });

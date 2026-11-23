@@ -1,9 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { insertChunk, readChunks, writeChunks } from "../core/png/chunks.ts";
+import { insertChunk, readChunks, writeChunks, type PngChunk } from "../core/png/chunks.ts";
 import { decodeITxt, encodeITxt } from "../core/png/itxt.ts";
 import { createRandom } from "../core/random.ts";
 import { defaultRecipe, type Asset, type DrawingLayer, type Recipe } from "../core/recipe.ts";
 import { compress } from "./bytes.ts";
+import projectV1Png from "./fixtures/project-v1.png?inline";
 import { embedProject, ProjectFileError, readProject } from "./projectFile.ts";
 
 /** A 2 × 1 RGB image, zlib data and all. */
@@ -78,11 +79,15 @@ function project(): Recipe {
   };
 }
 
-/** A PNG holding `text` (compressed for it) under the project keyword. */
-async function withText(text: string, compressed = true): Promise<Uint8Array> {
+/** `image` with `text` (compressed for it) added under the project keyword. */
+async function withText(
+  text: string,
+  compressed = true,
+  image: Uint8Array = tinyPng(),
+): Promise<Uint8Array> {
   const bytes = new TextEncoder().encode(text);
   return insertChunk(
-    tinyPng(),
+    image,
     encodeITxt({
       keyword: "eye-llusion-recipe",
       compressed,
@@ -91,20 +96,23 @@ async function withText(text: string, compressed = true): Promise<Uint8Array> {
   );
 }
 
-async function problem(bytes: Uint8Array): Promise<string> {
+/** The kind of problem reading the file, or undefined if it opens. */
+async function problem(bytes: Uint8Array): Promise<string | undefined> {
   const error: unknown = await readProject(bytes).then(
     () => undefined,
     (reason: unknown) => reason,
   );
+  if (error === undefined) {
+    return undefined;
+  }
   if (!(error instanceof ProjectFileError)) {
-    throw new TypeError(`expected a ProjectFileError, got ${String(error)}`);
+    throw new TypeError("expected a ProjectFileError", { cause: error });
   }
   return error.kind;
 }
 
-/** The embedded project as plain JSON, for tampering with. */
-async function embeddedJson(recipe: Recipe): Promise<Record<string, unknown>> {
-  const png = await embedProject(tinyPng(), recipe);
+/** The JSON in a project's iTXt chunk. */
+async function textJson(png: Uint8Array): Promise<Record<string, unknown>> {
   const chunk = readChunks(png).find((each) => each.type === "iTXt");
   if (chunk === undefined) {
     throw new Error("no iTXt chunk");
@@ -119,6 +127,26 @@ async function embeddedJson(recipe: Recipe): Promise<Record<string, unknown>> {
   return { ...parsed };
 }
 
+/** The embedded project's JSON, for tampering with, and the file without it. */
+async function embedded(
+  recipe: Recipe,
+): Promise<{ json: Record<string, unknown>; image: Uint8Array }> {
+  const png = await embedProject(tinyPng(), recipe);
+  const image = writeChunks(readChunks(png).filter((chunk) => chunk.type !== "iTXt"));
+  return { json: await textJson(png), image };
+}
+
+async function embeddedJson(recipe: Recipe): Promise<Record<string, unknown>> {
+  return (await embedded(recipe)).json;
+}
+
+function fields(value: unknown): Record<string, unknown> {
+  if (typeof value !== "object" || value === null) {
+    throw new TypeError("not an object");
+  }
+  return { ...value };
+}
+
 describe("PNG project files", () => {
   test("round-trips a recipe with grey and colour assets through bytes", async () => {
     const recipe = project();
@@ -126,13 +154,40 @@ describe("PNG project files", () => {
     expect(await readProject(png)).toEqual(recipe);
   });
 
-  test("adds one compressed iTXt chunk after IHDR and leaves the image alone", async () => {
+  test("adds a compressed iTXt chunk after IHDR, a chunk per asset before IEND, and leaves the image alone", async () => {
     const png = await embedProject(tinyPng(), project());
     const chunks = readChunks(png);
-    expect(chunks.map((chunk) => chunk.type)).toEqual(["IHDR", "iTXt", "IDAT", "IEND"]);
+    expect(chunks.map((chunk) => chunk.type)).toEqual([
+      "IHDR",
+      "iTXt",
+      "IDAT",
+      "eyAs",
+      "eyAs",
+      "IEND",
+    ]);
     const text = decodeITxt(chunks[1]);
     expect(text).toMatchObject({ keyword: "eye-llusion-recipe", compressed: true });
     expect(chunks[2].data).toEqual(readChunks(tinyPng())[1].data);
+    const ids = chunks.slice(3, 5).map((chunk) => {
+      const end = chunk.data.indexOf(0);
+      return new TextDecoder().decode(chunk.data.subarray(0, end));
+    });
+    expect(ids).toEqual(["image-1", "tile-1"]);
+  });
+
+  test("names the asset chunk as ancillary, private and safe to copy", () => {
+    // PNG reads those properties from the case of the first, second and fourth
+    // letters, and the third must be upper case.
+    expect("eyAs").toMatch(/^[a-z][a-z][A-Z][a-z]$/);
+  });
+
+  test("keeps assets out of the text", async () => {
+    const json = await embeddedJson(project());
+    expect(json.format).toBe(2);
+    expect(fields(json.assets)).toEqual({
+      "image-1": { format: "gray", width: 300, height: 200 },
+      "tile-1": { format: "rgba", width: 64, height: 48 },
+    });
   });
 
   test("stores assets compactly", async () => {
@@ -171,7 +226,7 @@ describe("PNG project files", () => {
   });
 
   test("reports projects from a newer version", async () => {
-    expect(await problem(await withText('{"format":2}'))).toBe("newer");
+    expect(await problem(await withText('{"format":3}'))).toBe("newer");
   });
 
   test("reports recipes from a newer version", async () => {
@@ -190,49 +245,94 @@ describe("PNG project files", () => {
   });
 
   test("checks asset sizes before inflating them", async () => {
-    const json = await embeddedJson(project());
-    const assets: unknown = json.assets;
-    if (typeof assets !== "object" || assets === null) {
-      throw new TypeError("no assets");
-    }
-    const image: unknown = Object.entries(assets).find(([id]) => id === "image-1")?.[1];
-    if (typeof image !== "object" || image === null) {
-      throw new TypeError("no image asset");
-    }
+    const { json, image: withAssets } = await embedded(project());
+    const assets = fields(json.assets);
+    const image = fields(assets["image-1"]);
     const tamper = async (patch: Record<string, unknown>) =>
       problem(
         await withText(
           JSON.stringify({ ...json, assets: { ...assets, "image-1": { ...image, ...patch } } }),
+          true,
+          withAssets,
         ),
       );
+    expect(await tamper({})).toBe(undefined);
     expect(await tamper({ width: 4096 })).toBe("invalid");
     expect(await tamper({ width: 0 })).toBe("invalid");
     expect(await tamper({ format: "rgb" })).toBe("invalid");
-    expect(await tamper({ data: 5 })).toBe("invalid");
     // The data inflates to more or fewer bytes than the size says.
     expect(await tamper({ width: 299 })).toBe("broken");
     expect(await tamper({ width: 301 })).toBe("broken");
-    expect(await tamper({ data: "@@" })).toBe("broken");
     const many = Object.fromEntries(
       Array.from({ length: 17 }, (_, i) => [`image-${String(i)}`, image]),
     );
-    expect(await problem(await withText(JSON.stringify({ ...json, assets: many })))).toBe(
-      "invalid",
+    expect(
+      await problem(await withText(JSON.stringify({ ...json, assets: many }), true, withAssets)),
+    ).toBe("invalid");
+  });
+
+  test("reports missing, repeated and corrupt asset chunks", async () => {
+    const { json, image } = await embedded(project());
+    const text = JSON.stringify(json);
+    const chunks = readChunks(image);
+    const assetChunks = chunks.filter((chunk) => chunk.type === "eyAs");
+    const others = chunks.filter((chunk) => chunk.type !== "eyAs");
+    const end = others.length - 1;
+    const withChunks = async (...extra: PngChunk[]) =>
+      problem(
+        await withText(text, true, writeChunks([...others.slice(0, end), ...extra, others[end]])),
+      );
+    expect(await withChunks(...assetChunks)).toBe(undefined);
+    expect(await withChunks(assetChunks[1])).toBe("broken");
+    expect(await withChunks(assetChunks[0], assetChunks[0], assetChunks[1])).toBe("broken");
+    const corrupt = assetChunks[0].data.slice(0, 12);
+    corrupt[11] ^= 0xff;
+    expect(await withChunks({ type: "eyAs", data: corrupt }, assetChunks[1])).toBe("broken");
+    expect(await withChunks({ type: "eyAs", data: Uint8Array.of(0, 1) }, ...assetChunks)).toBe(
+      "broken",
     );
   });
 
   test("validates the recipe before inflating any asset", async () => {
     const json = await embeddedJson(project());
-    const assets = { "image-1": { format: "gray", width: 300, height: 200, data: "@@" } };
+    const assets = { "image-1": { format: "gray", width: 300, height: 200 } };
     const bad = { ...json, recipe: { ...defaultRecipe(), assets: undefined, layers: "x" }, assets };
+    // There is no asset chunk at all, which would be reported as damage if it was looked for.
     expect(await problem(await withText(JSON.stringify(bad)))).toBe("invalid");
   });
 
   test("inflates only the assets the recipe uses", async () => {
-    const json = await embeddedJson(project());
-    const unused = { format: "gray", width: 300, height: 200, data: "@@" };
-    const assets = { ...(json.assets as object), unused };
-    const recipe = await readProject(await withText(JSON.stringify({ ...json, assets })));
+    const { json, image } = await embedded(project());
+    const unused = { format: "gray", width: 300, height: 200 };
+    const assets = { ...fields(json.assets), unused };
+    const recipe = await readProject(
+      await withText(JSON.stringify({ ...json, assets }), true, image),
+    );
     expect(Object.keys(recipe.assets).toSorted()).toEqual(["image-1", "tile-1"]);
+  });
+});
+
+describe("format 1 project files", () => {
+  /** The JSON from a file saved in format 1, which held assets as base64 text. */
+  async function formatOne(): Promise<Record<string, unknown>> {
+    const base64 = projectV1Png.slice(projectV1Png.indexOf(",") + 1);
+    return textJson(Uint8Array.from(atob(base64), (char) => char.codePointAt(0) ?? 0));
+  }
+
+  test("checks inline asset data", async () => {
+    const json = await formatOne();
+    expect(json.format).toBe(1);
+    const assets = fields(json.assets);
+    const photo = fields(assets.photo);
+    const tamper = async (patch: Record<string, unknown>) =>
+      problem(
+        await withText(
+          JSON.stringify({ ...json, assets: { ...assets, photo: { ...photo, ...patch } } }),
+        ),
+      );
+    expect(await tamper({})).toBe(undefined);
+    expect(await tamper({ data: 5 })).toBe("invalid");
+    expect(await tamper({ data: "@@" })).toBe("broken");
+    expect(await tamper({ width: 4 })).toBe("broken");
   });
 });
