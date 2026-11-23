@@ -1,15 +1,20 @@
 import { describe, expect, test, vi } from "vitest";
 import { defaultRecipe, type Asset, type Recipe } from "../core/recipe.ts";
 import { isRenderAborted, RenderClient, type RenderImage } from "./client.ts";
-import type { RenderRequest, RenderResponse } from "./protocol.ts";
+import type { RenderRequest, RenderResponse, WorkerMessage } from "./protocol.ts";
 
 class FakeWorker extends EventTarget {
   readonly requests: RenderRequest[] = [];
+  readonly cancels: number[] = [];
   readonly images: { close: ReturnType<typeof vi.fn<() => void>> }[] = [];
   terminate = vi.fn<() => void>();
 
-  postMessage(request: RenderRequest): void {
-    this.requests.push(request);
+  postMessage(message: WorkerMessage): void {
+    if (message.type === "cancel") {
+      this.cancels.push(message.requestId);
+    } else {
+      this.requests.push(message);
+    }
   }
 
   /** Replies to the oldest unanswered request with a fresh fake bitmap. */
@@ -98,6 +103,25 @@ describe("RenderClient", () => {
     await expect(first).rejects.toSatisfy(isRenderAborted);
     expect(client.pending).toBe(1);
     second.catch(() => undefined);
+  });
+
+  test("asks the worker to cancel the render a newer call replaces", async () => {
+    const { worker, client } = setup();
+    const full = client.render({ ...defaultRecipe(), seed: 1 }, SIZE);
+    const [first] = worker.requests;
+    expect(worker.cancels).toEqual([]);
+    const draft = client.render({ ...defaultRecipe(), seed: 2 }, SIZE);
+    void client.render({ ...defaultRecipe(), seed: 3 }, SIZE).catch(() => undefined);
+    const latest = client.render({ ...defaultRecipe(), seed: 4 }, SIZE);
+    await expect(full).rejects.toSatisfy(isRenderAborted);
+    await expect(draft).rejects.toSatisfy(isRenderAborted);
+    expect(worker.cancels).toEqual([first.requestId]);
+
+    worker.send({ requestId: first.requestId, ok: false, message: "Cancelled" });
+    worker.requests.shift();
+    expect(worker.requests.map((r) => r.recipe.seed)).toEqual([4]);
+    worker.reply();
+    expect(await latest).toBe(worker.images[0]);
   });
 
   test("sends each asset once and stops tracking removed ones", () => {

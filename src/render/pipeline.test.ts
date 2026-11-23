@@ -10,6 +10,7 @@ function asset(value: number): Asset {
 
 function request(overrides: Partial<RenderRequest>): RenderRequest {
   return {
+    type: "render",
     requestId: 1,
     recipe: defaultRecipe(),
     width: 64,

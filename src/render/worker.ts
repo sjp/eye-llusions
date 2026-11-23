@@ -3,7 +3,7 @@ import type { Asset } from "../core/recipe.ts";
 import type { RasteriserRegistry } from "../core/depth/raster.ts";
 import { createSampleRasteriser } from "./figures.ts";
 import { renderPixels, restoreAssets } from "./pipeline.ts";
-import type { RenderRequest } from "./protocol.ts";
+import type { WorkerMessage } from "./protocol.ts";
 import { createRenderQueue } from "./queue.ts";
 import { createTextRasteriser } from "./text.ts";
 
@@ -40,9 +40,9 @@ async function toImage(
 }
 
 const enqueue = createRenderQueue(
-  async (request) => {
+  async (request, pause) => {
     const recipe = restoreAssets(assets, request);
-    const pixels = await renderPixels(recipe, request, rasterisers, buffer);
+    const pixels = await renderPixels(recipe, request, rasterisers, buffer, pause);
     const image = await toImage(pixels, request.width, request.height);
     return { image, transfer: [image instanceof ImageData ? image.data.buffer : image] };
   },
@@ -51,6 +51,6 @@ const enqueue = createRenderQueue(
   },
 );
 
-addEventListener("message", (event: MessageEvent<RenderRequest>) => {
+addEventListener("message", (event: MessageEvent<WorkerMessage>) => {
   void enqueue(event.data);
 });

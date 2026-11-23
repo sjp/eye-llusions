@@ -1,5 +1,5 @@
 import type { Asset, Recipe } from "../core/recipe.ts";
-import type { RenderOutput, RenderRequest, RenderResponse } from "./protocol.ts";
+import type { CancelRequest, RenderOutput, RenderRequest, RenderResponse } from "./protocol.ts";
 
 /** Rejects a render that a newer request replaced before it finished. */
 class RenderAbortedError extends Error {
@@ -51,7 +51,8 @@ const MAX_FAILURES = 3;
  * Renders recipes in one long-lived worker. The latest request wins: a newer call
  * rejects every unfinished one with `RenderAbortedError`. At most one request is with
  * the worker at a time and only the newest waiting call is sent after it, so a burst
- * of calls costs at most two renders. A worker that fails is replaced on the next call,
+ * of calls costs at most two renders; the worker is asked to cut the first one short.
+ * A worker that fails is replaced on the next call,
  * until it has failed `MAX_FAILURES` times in a row.
  */
 export class RenderClient {
@@ -76,6 +77,7 @@ export class RenderClient {
   }
 
   render(recipe: Recipe, size: RenderSize, options: RenderOptions = {}): Promise<RenderImage> {
+    this.#cancelInFlight();
     this.#abortPending();
     if (this.#disposed) {
       return Promise.reject(new Error("The renderer has been stopped"));
@@ -138,6 +140,15 @@ export class RenderClient {
     this.#sent.clear();
   }
 
+  /** Asks the worker to stop the render it's on, which this call is about to replace. */
+  #cancelInFlight(): void {
+    const inFlight = this.#inFlight;
+    if (inFlight?.job !== undefined && this.#worker !== undefined) {
+      const cancel: CancelRequest = { type: "cancel", requestId: inFlight.requestId };
+      this.#worker.postMessage(cancel, []);
+    }
+  }
+
   #abortPending(): void {
     this.#queued?.reject(new RenderAbortedError());
     this.#queued = undefined;
@@ -166,6 +177,7 @@ export class RenderClient {
     }
     const requestId = this.#nextId++;
     const request: RenderRequest = {
+      type: "render",
       requestId,
       recipe: { ...job.recipe, assets: {} },
       width: job.size.width,
