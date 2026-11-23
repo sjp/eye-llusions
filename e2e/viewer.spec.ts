@@ -1,9 +1,10 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { watchPage } from "./guard.ts";
+import { openCreate } from "./preview.ts";
 
 async function openViewer(page: Page) {
   const watched = await watchPage(page);
-  await page.goto("./");
+  await openCreate(page);
   await expect(page.locator(".preview-canvas")).toHaveAttribute("data-quality", "full");
   await page.getByRole("button", { name: "View" }).click();
   const viewer = page.getByRole("dialog", { name: "Viewer" });

@@ -1,10 +1,18 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { watchPage } from "./guard.ts";
 
+/** Opens a share link's `#r=…` fragment, or else the gallery and then a blank scene. */
+export async function openCreate(page: Page, hash = "") {
+  await page.goto(`./${hash}`);
+  if (hash === "") {
+    await page.getByRole("button", { name: "Start from blank" }).click();
+  }
+}
+
 /** Opens the Create screen, or a share link's `#r=…` fragment, with the controls showing. */
 export async function openLayers(page: Page, hash = "") {
   const watched = await watchPage(page);
-  await page.goto(`./${hash}`);
+  await openCreate(page, hash);
   const canvas = page.locator(".preview-canvas");
   await expect(canvas).toHaveAttribute("data-quality", "full");
   const handle = page.getByRole("button", { name: "Controls" });

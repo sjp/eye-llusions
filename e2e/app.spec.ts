@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { watchPage } from "./guard.ts";
+import { openCreate } from "./preview.ts";
 
 declare global {
   interface Window {
@@ -24,7 +25,7 @@ async function open(page: Page, viewport?: { width: number; height: number }) {
       }
     }).observe(document, { subtree: true, attributes: true, attributeFilter: ["data-renders"] });
   });
-  await page.goto("./");
+  await openCreate(page);
   const canvas = page.locator(".preview-canvas");
   await expect(canvas).toHaveAttribute("data-quality", "full");
   return { ...watched, canvas };

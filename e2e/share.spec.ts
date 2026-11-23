@@ -65,7 +65,7 @@ test("a damaged link shows an error and opens the default scene", async ({ page 
 
 test("the toolbar fits the screen with all its buttons", async ({ page }) => {
   await openLayers(page);
-  for (const name of ["Open", "Save", "Share", "View", "Undo", "Redo"]) {
+  for (const name of ["Gallery", "Open", "Save", "Share", "View", "Undo", "Redo"]) {
     await expect(page.getByRole("button", { name, exact: true })).toBeInViewport({ ratio: 1 });
   }
   const overflow = await page
