@@ -28,3 +28,7 @@ npm_root=$(npm root -g)
 if [ -d "$npm_root/@anthropic-ai" ]; then
     sudo chown -R "$(id -u):$(id -g)" "$npm_root/@anthropic-ai"
 fi
+
+# Project dependencies and the browsers the Playwright tests run in.
+npm ci
+npx playwright install --with-deps chromium firefox webkit
