@@ -57,8 +57,7 @@ export function createSampleRasteriser(
   const figures = new Map<FigureId, Promise<FigureImage>>();
   return async (layer, context) => {
     if (layer.shape.type !== "figure") {
-      rasteriseSample(layer, context);
-      return;
+      return rasteriseSample(layer, context);
     }
     const id = layer.shape.figure;
     let figure = figures.get(id);
@@ -69,6 +68,6 @@ export function createSampleRasteriser(
         figures.delete(id);
       });
     }
-    rasteriseFigure(layer, context, await figure);
+    return rasteriseFigure(layer, context, await figure);
   };
 }

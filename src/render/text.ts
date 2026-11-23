@@ -7,6 +7,8 @@ import { loadFont } from "./fonts.ts";
 /** Generous ink bounds around each line, in ems, so no glyph is clipped. */
 const INK = { above: 1.3, below: 0.5, side: 0.3 };
 
+const EMPTY = { x0: 0, y0: 0, x1: 0, y1: 0 };
+
 /** Font size, in pixels, at which glyph advances are measured. */
 const REFERENCE_SIZE = 1000;
 
@@ -58,7 +60,7 @@ export function createTextRasteriser(load = loadFont): Rasteriser<TextLayer> {
   return async (layer, { width, height, target }) => {
     const family = await load(layer.font);
     if (layer.text.trim() === "") {
-      return;
+      return EMPTY;
     }
     canvas ??= new OffscreenCanvas(1, 1);
     const context = canvas.getContext("2d", { willReadFrequently: true });
@@ -96,7 +98,7 @@ export function createTextRasteriser(load = loadFont): Rasteriser<TextLayer> {
     const regionWidth = right - left;
     const regionHeight = lower - upper;
     if (regionWidth <= 0 || regionHeight <= 0) {
-      return;
+      return EMPTY;
     }
 
     // Resizing clears the canvas and resets the context's state.
@@ -124,12 +126,15 @@ export function createTextRasteriser(load = loadFont): Rasteriser<TextLayer> {
 
     const x0 = Math.max(0, left);
     const x1 = Math.min(width, right);
-    for (let y = Math.max(0, upper); y < Math.min(height, upper + regionHeight); y++) {
+    const y0 = Math.max(0, upper);
+    const y1 = Math.min(height, upper + regionHeight);
+    for (let y = y0; y < y1; y++) {
       const from = (y - upper) * regionWidth - left;
       for (let x = x0; x < x1; x++) {
         target.coverage[y * width + x] = coverage[from + x];
         target.depth[y * width + x] = depth[from + x];
       }
     }
+    return { x0, y0, x1, y1 };
   };
 }

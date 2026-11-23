@@ -1,5 +1,5 @@
 import type { SampleLayer } from "../recipe.ts";
-import type { RasterContext } from "./raster.ts";
+import type { RasterBounds, RasterContext } from "./raster.ts";
 
 /** Bundled depth pictures, in the order they're offered. */
 export const FIGURES = [
@@ -80,7 +80,7 @@ export function rasteriseFigure(
   layer: SampleLayer,
   { width, height, target }: RasterContext,
   figure: FigureImage,
-): void {
+): RasterBounds {
   const side = layer.size * height;
   const level = figure.levels.findLast((candidate) => candidate.size >= side) ?? figure.levels[0];
   const { size, premultiplied, coverage } = level;
@@ -119,4 +119,5 @@ export function rasteriseFigure(
       target.depth[i] = Math.min(1, filled / alpha);
     }
   }
+  return { x0, y0, x1, y1 };
 }

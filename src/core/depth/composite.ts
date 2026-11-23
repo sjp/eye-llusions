@@ -1,5 +1,11 @@
 import type { Layer, Recipe } from "../recipe.ts";
-import type { LayerField, RasterContext, Rasteriser, RasteriserRegistry } from "./raster.ts";
+import type {
+  LayerField,
+  RasterBounds,
+  RasterContext,
+  Rasteriser,
+  RasteriserRegistry,
+} from "./raster.ts";
 import { rasteriseDrawing } from "./drawing.ts";
 import { rasteriseImage } from "./image.ts";
 import { rasteriseSample } from "./sample.ts";
@@ -11,24 +17,47 @@ export const CORE_RASTERISERS: RasteriserRegistry = {
   image: rasteriseImage,
 };
 
-/** Runs a rasteriser if there is one, resolving to whether the layer was drawn. */
+type Drawn = RasterBounds | undefined;
+
+/** `bounds` clipped to the canvas, or the whole canvas when there are none. */
+function clip(bounds: RasterBounds | undefined, width: number, height: number): RasterBounds {
+  if (bounds === undefined) {
+    return { x0: 0, y0: 0, x1: width, y1: height };
+  }
+  const x0 = Math.max(0, bounds.x0);
+  const y0 = Math.max(0, bounds.y0);
+  return {
+    x0,
+    y0,
+    x1: Math.max(x0, Math.min(width, bounds.x1)),
+    y1: Math.max(y0, Math.min(height, bounds.y1)),
+  };
+}
+
+/**
+ * Runs a rasteriser if there is one, resolving to the canvas bounds it drew within, or
+ * to undefined if the layer wasn't drawn.
+ */
 function run<L>(
   rasteriser: Rasteriser<L> | undefined,
   layer: L,
   context: RasterContext,
-): boolean | Promise<boolean> {
+): Drawn | Promise<Drawn> {
   if (rasteriser === undefined) {
-    return false;
+    return undefined;
   }
+  const { width, height } = context;
   const result = rasteriser(layer, context);
-  return result instanceof Promise ? result.then(() => true) : true;
+  return result instanceof Promise
+    ? result.then((bounds) => clip(bounds, width, height))
+    : clip(result, width, height);
 }
 
 function rasterise(
   layer: Layer,
   registry: RasteriserRegistry,
   context: RasterContext,
-): boolean | Promise<boolean> {
+): Drawn | Promise<Drawn> {
   switch (layer.kind) {
     case "sample":
       return run(registry.sample, layer, context);
@@ -39,37 +68,53 @@ function rasterise(
     case "image":
       return run(registry.image, layer, context);
     default:
-      return false;
+      return undefined;
   }
 }
 
-function blend(out: Float32Array, layer: Layer, { depth, coverage }: LayerField): void {
+function blend(
+  out: Float32Array,
+  layer: Layer,
+  { depth, coverage }: LayerField,
+  width: number,
+  { x0, y0, x1, y1 }: RasterBounds,
+): void {
   const strength = layer.depth;
-  for (let i = 0; i < out.length; i++) {
-    const alpha = coverage[i];
-    if (alpha <= 0) {
-      continue;
+  for (let y = y0; y < y1; y++) {
+    for (let i = y * width + x0, end = y * width + x1; i < end; i++) {
+      const alpha = coverage[i];
+      if (alpha <= 0) {
+        continue;
+      }
+      const d = out[i];
+      const v = depth[i] * strength;
+      let next: number;
+      switch (layer.blend) {
+        case "max":
+          next = v > d ? d + (v - d) * alpha : d;
+          break;
+        case "add":
+          next = d + v * alpha;
+          break;
+        case "subtract":
+          next = d - v * alpha;
+          break;
+        case "replace":
+          next = d + (v - d) * alpha;
+          break;
+        default:
+          next = d;
+      }
+      out[i] = next < 0 ? 0 : next > 1 ? 1 : next;
     }
-    const d = out[i];
-    const v = depth[i] * strength;
-    let next: number;
-    switch (layer.blend) {
-      case "max":
-        next = v > d ? d + (v - d) * alpha : d;
-        break;
-      case "add":
-        next = d + v * alpha;
-        break;
-      case "subtract":
-        next = d - v * alpha;
-        break;
-      case "replace":
-        next = d + (v - d) * alpha;
-        break;
-      default:
-        next = d;
-    }
-    out[i] = next < 0 ? 0 : next > 1 ? 1 : next;
+  }
+}
+
+/** Zeroes `bounds` of a layer field, which is otherwise zero. */
+function clear({ depth, coverage }: LayerField, width: number, bounds: RasterBounds): void {
+  for (let y = bounds.y0; y < bounds.y1; y++) {
+    depth.fill(0, y * width + bounds.x0, y * width + bounds.x1);
+    coverage.fill(0, y * width + bounds.x0, y * width + bounds.x1);
   }
 }
 
@@ -111,15 +156,19 @@ export async function compositeDepth(
     coverage: sized(buffers.target?.coverage, size),
   };
   const context: RasterContext = { recipe, width, height, target };
+  // Where the target may hold values from before: anywhere in reused buffers.
+  let dirty: RasterBounds | undefined = { x0: 0, y0: 0, x1: width, y1: height };
   for (const layer of recipe.layers) {
     if (!layer.visible) {
       continue;
     }
     await pause?.();
-    target.depth.fill(0);
-    target.coverage.fill(0);
-    if (await rasterise(layer, registry, context)) {
-      blend(out, layer, target);
+    if (dirty !== undefined) {
+      clear(target, width, dirty);
+    }
+    dirty = await rasterise(layer, registry, context);
+    if (dirty !== undefined) {
+      blend(out, layer, target, width, dirty);
     }
   }
   return out;

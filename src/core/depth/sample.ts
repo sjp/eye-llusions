@@ -1,5 +1,5 @@
 import type { SampleLayer, SampleShape } from "../recipe.ts";
-import type { RasterContext } from "./raster.ts";
+import type { RasterBounds, RasterContext } from "./raster.ts";
 
 const TAU = 2 * Math.PI;
 
@@ -114,10 +114,10 @@ function shapeFunctions(shape: SampleShape): ShapeFunctions | undefined {
 export function rasteriseSample(
   layer: SampleLayer,
   { width, height, target }: RasterContext,
-): void {
+): RasterBounds {
   const functions = shapeFunctions(layer.shape);
   if (functions === undefined) {
-    return;
+    return { x0: 0, y0: 0, x1: 0, y1: 0 };
   }
   const { height: shapeHeight, inside } = functions;
   const radius = (layer.size / 2) * height;
@@ -143,4 +143,5 @@ export function rasteriseSample(
       target.depth[i] = shapeHeight(u, v, r, edge);
     }
   }
+  return { x0, y0, x1, y1 };
 }

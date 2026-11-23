@@ -213,7 +213,7 @@ export function thresholdDepth(depth: Float32Array, cutoff: number): void {
  * Rasterises an image layer: fit, levels, invert, blur, posterize, then threshold. A
  * layer whose asset the recipe lacks draws nothing.
  */
-export function rasteriseImage(layer: ImageLayer, context: RasterContext): void {
+export function rasteriseImage(layer: ImageLayer, context: RasterContext): undefined {
   const { recipe, width, height, target } = context;
   if (!Object.hasOwn(recipe.assets, layer.asset)) {
     return;

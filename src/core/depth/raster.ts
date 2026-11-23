@@ -18,8 +18,18 @@ export type RasterContext = {
   target: LayerField;
 };
 
-/** Fills `context.target` for a layer. Rasterisers that need fonts or a canvas may be async. */
-export type Rasteriser<L> = (layer: L, context: RasterContext) => void | Promise<void>;
+/** Columns `x0` up to `x1` of rows `y0` up to `y1`, each end exclusive. */
+export type RasterBounds = { x0: number; y0: number; x1: number; y1: number };
+
+/**
+ * Fills `context.target` for a layer. Rasterisers that need fonts or a canvas may be
+ * async. One that returns bounds has written nothing outside them, so the compositor
+ * can skip the rest of the canvas.
+ */
+export type Rasteriser<L> = (
+  layer: L,
+  context: RasterContext,
+) => RasterBounds | undefined | Promise<RasterBounds | undefined>;
 
 /**
  * Rasterisers by layer kind. Layers whose kind has none are skipped, so environments

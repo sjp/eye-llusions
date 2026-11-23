@@ -402,7 +402,7 @@ export function strokeCost(stroke: Stroke, aspect: number): number {
  * `raise` and `lower` add or remove it, clamped to 0..1, and `smooth` blurs what is
  * already painted. Brush weight falls off from the middle with the brush's softness.
  */
-export function rasteriseDrawing(layer: DrawingLayer, context: RasterContext): void {
+export function rasteriseDrawing(layer: DrawingLayer, context: RasterContext): undefined {
   const { width, height } = context;
   const scratchBuffers = scratchFor(width, height);
   const { mask, spans } = scratchBuffers;
