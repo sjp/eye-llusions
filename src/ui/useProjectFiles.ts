@@ -12,15 +12,15 @@ import type { Notice } from "./Notice.tsx";
 const MAX_FILE_BYTES = 200 * 1024 * 1024;
 
 /**
- * Opens PNG files saved by the app as an undoable change. Other images can be added as
- * an image layer instead. Problems and offers are reported as notices; `report` must
+ * Opens PNG files saved by the app as an undoable change, or with a fresh history when
+ * `fresh` is set. Other images can be added as an image layer instead. Problems and offers are reported as notices; `report` must
  * keep its identity across renders.
  */
 export function useProjectFiles(
   editor: Editor,
   selection: Signal<string | undefined>,
   report: (notice: Notice | undefined) => void,
-): (file: File) => Promise<void> {
+): (file: File, options?: { fresh?: boolean }) => Promise<void> {
   const addImageLayer = useCallback(
     async (file: File): Promise<void> => {
       report(undefined);
@@ -66,14 +66,14 @@ export function useProjectFiles(
   );
 
   return useCallback(
-    async (file: File): Promise<void> => {
+    async (file: File, { fresh = false }: { fresh?: boolean } = {}): Promise<void> => {
       if (file.size > MAX_FILE_BYTES) {
         report({ tone: "error", text: "That file is too large to be an Eye-llusion project." });
         return;
       }
       try {
         const recipe = await readProject(new Uint8Array(await file.arrayBuffer()));
-        editor.open(recipe);
+        editor.open(recipe, { fresh });
         report(undefined);
       } catch (error) {
         if (error instanceof ProjectFileError && error.kind === "none") {

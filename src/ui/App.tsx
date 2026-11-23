@@ -1,6 +1,6 @@
 import { useSignal } from "@preact/signals";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-import { defaultRecipe } from "../core/recipe.ts";
+import { defaultRecipe, type Recipe } from "../core/recipe.ts";
 import { Editor } from "../state/editor.ts";
 import { linkPayload } from "../state/share.ts";
 import { ControlSheet, type SheetSnap } from "./ControlSheet.tsx";
@@ -20,6 +20,7 @@ import { ToolbarMenu } from "./ToolbarMenu.tsx";
 import { useProjectFiles } from "./useProjectFiles.ts";
 import { useRenderer } from "./useRenderer.ts";
 import { useCreateEntry } from "./useCreateEntry.ts";
+import { useFileDrop } from "./useFileDrop.ts";
 import { useMediaQuery } from "./useMediaQuery.ts";
 import { useShareLink } from "./useShareLink.ts";
 import { useUndoShortcuts } from "./useUndoShortcuts.ts";
@@ -46,10 +47,6 @@ type Screen = "gallery" | "create";
 
 /** Below this width the file actions move into a menu so the toolbar fits. */
 const COMPACT_TOOLBAR = "(max-width: 409px)";
-
-function hasFiles(event: DragEvent): boolean {
-  return event.dataTransfer?.types.includes("Files") ?? false;
-}
 
 export function App({
   editor: givenEditor,
@@ -101,6 +98,30 @@ export function App({
   useUndoShortcuts(editor);
   useUnloadWarning(screen === "create" && editor.modified.value);
 
+  const start = (recipe = defaultRecipe()): void => {
+    editor.open(recipe, { fresh: true });
+    selection.value = undefined;
+    setNotice(undefined);
+  };
+
+  const enterCreate = (recipe?: Recipe): void => {
+    start(recipe);
+    createEntry.enter();
+    setScreen("create");
+  };
+
+  const dropFile =
+    screen === "gallery"
+      ? (file: File): void => {
+          enterCreate();
+          void openFile(file, { fresh: true });
+        }
+      : (file: File): void => {
+          void openFile(file);
+        };
+  // The viewer only shows the scene, so files dropped on it are ignored.
+  useFileDrop(viewing ? undefined : dropFile);
+
   useEffect(() => {
     if (wasViewing.current && !viewing) {
       viewButton.current?.focus();
@@ -114,12 +135,6 @@ export function App({
     );
   }
 
-  const start = (recipe = defaultRecipe()): void => {
-    editor.open(recipe, { fresh: true });
-    selection.value = undefined;
-    setNotice(undefined);
-  };
-
   if (screen === "gallery") {
     return (
       <Gallery
@@ -129,14 +144,10 @@ export function App({
           enter();
         }}
         onRemix={(sample: GallerySample) => {
-          start(sample.recipe);
-          createEntry.enter();
-          setScreen("create");
+          enterCreate(sample.recipe);
         }}
         onBlank={() => {
-          start();
-          createEntry.enter();
-          setScreen("create");
+          enterCreate();
         }}
       />
     );
@@ -164,22 +175,7 @@ export function App({
 
   return (
     <DrawingToolsContext.Provider value={tools}>
-      <div
-        class="shell"
-        data-sheet={snap}
-        onDragOver={(event) => {
-          if (!event.defaultPrevented && hasFiles(event)) {
-            event.preventDefault();
-          }
-        }}
-        onDrop={(event) => {
-          const file = event.dataTransfer?.files[0];
-          if (!event.defaultPrevented && file !== undefined) {
-            event.preventDefault();
-            void openFile(file);
-          }
-        }}
-      >
+      <div class="shell" data-sheet={snap}>
         <header class="toolbar">
           <h1>Eye-llusion</h1>
           <div class="toolbar-actions">

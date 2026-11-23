@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { watchPage } from "./guard.ts";
 import { layerNames, openLayers, settledPixels, toolbarAction } from "./preview.ts";
@@ -149,6 +150,28 @@ test("viewing a sample opens the viewer and leads back to the gallery", async ({
   await expect(viewer.locator(".preview-canvas")).toHaveAttribute("data-quality", "full");
   await viewer.getByRole("button", { name: "Exit" }).click();
   await expect(page.getByRole("button", { name: "Start from blank" })).toBeVisible();
+  expect(violations).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test("a file dropped on the gallery opens in Create", async ({ page, isMobile }) => {
+  test.skip(isMobile, "Dragging files is a desktop gesture");
+  const { violations, errors } = await openGallery(page);
+  await page.locator(".gallery").evaluate(
+    (gallery, base64: string) => {
+      const data = Uint8Array.from(atob(base64), (char) => char.codePointAt(0) ?? 0);
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([data], "cone.png", { type: "image/png" }));
+      for (const type of ["dragenter", "dragover", "drop"]) {
+        gallery.dispatchEvent(
+          new DragEvent(type, { dataTransfer: transfer, bubbles: true, cancelable: true }),
+        );
+      }
+    },
+    readFileSync(new URL("fixtures/cone.png", import.meta.url)).toString("base64"),
+  );
+  await expect(page.getByRole("alert")).toContainText("doesn't contain an Eye-llusion project");
+  await expect(page.getByRole("button", { name: "View" })).toBeVisible();
   expect(violations).toEqual([]);
   expect(errors).toEqual([]);
 });
