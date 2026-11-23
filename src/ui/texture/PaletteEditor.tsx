@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "preact/hooks";
 import { RECIPE_LIMITS } from "../../core/parseRecipe.ts";
 import type { Palette } from "../../core/recipe.ts";
 import { luminanceSpread, MIN_LUMINANCE_SPREAD } from "../../core/texture/palette.ts";
@@ -14,21 +15,46 @@ function mix(from: string, to: string): string {
   return `#${value.toString(16).padStart(6, "0")}`;
 }
 
+type Action = "up" | "down" | "remove";
+
 /** The custom palette's colours, darkest first, with controls to add, remove and reorder them. */
 export function PaletteEditor({ stops, editor }: { stops: readonly string[]; editor: Editor }) {
+  const list = useRef<HTMLOListElement>(null);
+  /** The control to focus once the colours change: a row and the button pressed in it. */
+  const refocus = useRef<{ row: number; action: Action } | undefined>(undefined);
+
+  useEffect(() => {
+    const target = refocus.current;
+    refocus.current = undefined;
+    const rows = list.current?.children;
+    if (target === undefined || rows === undefined || rows.length === 0) {
+      return;
+    }
+    const row = rows[Math.min(target.row, rows.length - 1)];
+    const control = (action: Action) => {
+      const button = row.querySelector<HTMLButtonElement>(`[data-action="${action}"]`);
+      return button?.disabled === false ? button : null;
+    };
+    const other = target.action === "up" ? "down" : "up";
+    const fallback = target.action === "remove" ? row.querySelector("input") : control(other);
+    (control(target.action) ?? fallback)?.focus();
+  }, [stops]);
+
   const set = (next: string[], options: { coalesce?: string } = {}) => {
     editor.setTexture({ palette: { type: "custom", stops: next } }, options);
   };
   const move = (from: number, to: number) => {
     const next = [...stops];
     [next[from], next[to]] = [next[to], next[from]];
+    // Focus follows the colour as it moves.
+    refocus.current = { row: to, action: to < from ? "up" : "down" };
     set(next);
   };
   const last = stops.length - 1;
   return (
     <fieldset class="palette-editor">
       <legend>Colours, dark end first</legend>
-      <ol class="palette-stops">
+      <ol ref={list} class="palette-stops">
         {stops.map((stop, index) => {
           const name = `colour ${String(index + 1)}`;
           return (
@@ -53,6 +79,7 @@ export function PaletteEditor({ stops, editor }: { stops: readonly string[]; edi
                 type="button"
                 class="button layer-move"
                 aria-label={`Move ${name} up`}
+                data-action="up"
                 disabled={index === 0}
                 onClick={() => {
                   move(index, index - 1);
@@ -64,6 +91,7 @@ export function PaletteEditor({ stops, editor }: { stops: readonly string[]; edi
                 type="button"
                 class="button layer-move"
                 aria-label={`Move ${name} down`}
+                data-action="down"
                 disabled={index === last}
                 onClick={() => {
                   move(index, index + 1);
@@ -75,8 +103,10 @@ export function PaletteEditor({ stops, editor }: { stops: readonly string[]; edi
                 type="button"
                 class="button layer-move"
                 aria-label={`Remove ${name}`}
+                data-action="remove"
                 disabled={stops.length <= MIN_STOPS}
                 onClick={() => {
+                  refocus.current = { row: index, action: "remove" };
                   set(stops.filter((_, i) => i !== index));
                 }}
               >

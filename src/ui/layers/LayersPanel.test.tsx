@@ -89,6 +89,15 @@ describe("LayersPanel", () => {
     });
   });
 
+  test("a layer moved to the top or bottom keeps focus on its other move button", () => {
+    setup();
+    click("Add shape");
+    click("Move Sphere 2 down");
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Move Sphere 2 up" }));
+    click("Move Sphere 2 up");
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Move Sphere 2 down" }));
+  });
+
   test("toggles visibility", () => {
     const editor = setup();
     fireEvent.click(screen.getByRole("checkbox", { name: "Show Sphere" }));

@@ -1,5 +1,5 @@
 import { useSignal, type Signal } from "@preact/signals";
-import { useId, useState } from "preact/hooks";
+import { useEffect, useId, useRef, useState } from "preact/hooks";
 import { RECIPE_LIMITS } from "../../core/parseRecipe.ts";
 import type { Asset, Layer } from "../../core/recipe.ts";
 import type { Editor } from "../../state/editor.ts";
@@ -104,6 +104,20 @@ type RowProps = {
 
 function LayerRow(props: RowProps) {
   const { layer, index, count, selected } = props;
+  const upRef = useRef<HTMLButtonElement>(null);
+  const downRef = useRef<HTMLButtonElement>(null);
+  /** The move button pressed last, to keep focus on once the row has moved. */
+  const moved = useRef<"up" | "down" | undefined>(undefined);
+  useEffect(() => {
+    const pressed = moved.current;
+    moved.current = undefined;
+    if (pressed === undefined) {
+      return;
+    }
+    // At the top or bottom the pressed button is disabled, so focus the other one.
+    const [same, other] = pressed === "up" ? [upRef, downRef] : [downRef, upRef];
+    (same.current?.disabled === false ? same : other).current?.focus();
+  }, [index]);
   const Icon = LAYER_KINDS[layer.kind]?.Icon;
   const name = displayName(layer);
   let className = "layer-row";
@@ -153,22 +167,26 @@ function LayerRow(props: RowProps) {
         <span class={layer.visible ? "layer-name" : "layer-name hidden"}>{name}</span>
       </button>
       <button
+        ref={upRef}
         type="button"
         class="button layer-move"
         aria-label={`Move ${name} up`}
         disabled={index === count - 1}
         onClick={() => {
+          moved.current = "up";
           props.onMove(index + 1);
         }}
       >
         ↑
       </button>
       <button
+        ref={downRef}
         type="button"
         class="button layer-move"
         aria-label={`Move ${name} down`}
         disabled={index === 0}
         onClick={() => {
+          moved.current = "down";
           props.onMove(index - 1);
         }}
       >

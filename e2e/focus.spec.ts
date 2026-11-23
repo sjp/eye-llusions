@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { watchPage } from "./guard.ts";
-import { openCreate, toolbarAction } from "./preview.ts";
+import { openCreate, openLayers, toolbarAction } from "./preview.ts";
 
 /** Fails if focus has fallen back to the page itself. */
 async function expectFocusKept(page: Page) {
@@ -100,4 +100,30 @@ test("closing the leave, share and save dialogs returns focus to the toolbar", a
     compact ? more : page.getByRole("button", { name: "Save", exact: true }),
   ).toBeFocused();
   await expectFocusKept(page);
+});
+
+test("moving a layer or colour to the end keeps focus on its other move button", async ({
+  page,
+}) => {
+  await openLayers(page);
+  await page.getByRole("button", { name: "Add shape" }).click();
+  await page.getByRole("button", { name: "Move Sphere 2 down" }).click();
+  await expect(page.getByRole("button", { name: "Move Sphere 2 up" })).toBeFocused();
+  await page.getByRole("button", { name: "Move Sphere 2 up" }).click();
+  await expect(page.getByRole("button", { name: "Move Sphere 2 down" })).toBeFocused();
+
+  await page.getByRole("radio", { name: "Custom" }).check();
+  const add = page.getByRole("button", { name: "Add colour" });
+  await add.click();
+  await add.click();
+  const button = (name: string) => page.getByRole("button", { name, exact: true });
+  await button("Move colour 2 up").click();
+  await expect(button("Move colour 1 down")).toBeFocused();
+  await button("Move colour 3 down").click();
+  await expect(button("Move colour 4 up")).toBeFocused();
+  await button("Remove colour 4").click();
+  await expect(button("Remove colour 3")).toBeFocused();
+  await button("Remove colour 3").click();
+  // Two colours are the fewest, so focus moves to the colour itself.
+  await expect(page.getByLabel("Colour 2", { exact: true })).toBeFocused();
 });

@@ -110,6 +110,20 @@ test("custom colours can be added, removed, reordered and changed", () => {
   expect(stops()).toEqual(["#808080", "#ffffff"]);
 });
 
+test("focus follows a moved colour and stays in the list after a removal", () => {
+  setup();
+  fireEvent.click(screen.getByRole("radio", { name: "Custom" }));
+  fireEvent.click(screen.getByRole("button", { name: "Add colour" }));
+  const button = (name: string) => screen.getByRole("button", { name });
+  fireEvent.click(button("Move colour 2 up"));
+  // The moved colour is now first, where it can't move up.
+  expect(document.activeElement).toBe(button("Move colour 1 down"));
+  fireEvent.click(button("Move colour 2 down"));
+  expect(document.activeElement).toBe(button("Move colour 3 up"));
+  fireEvent.click(button("Remove colour 3"));
+  expect(document.activeElement).toBe(screen.getByLabelText("Colour 2"));
+});
+
 test("stops at eight colours", () => {
   setup();
   fireEvent.click(screen.getByRole("radio", { name: "Custom" }));
