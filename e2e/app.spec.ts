@@ -134,6 +134,15 @@ test("the keyboard moves the bottom sheet through every height", async ({ page }
   expect(errors).toEqual([]);
 });
 
+test("the bottom sheet doesn't animate when motion is reduced", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await open(page, { width: 390, height: 844 });
+  const sheet = page.getByRole("complementary", { name: "Controls" });
+  await expect(sheet).toHaveCSS("transition-duration", "0s");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await expect(sheet).not.toHaveCSS("transition-duration", "0s");
+});
+
 test("the preview toggles between the stereogram and the depth map", async ({ page }) => {
   const { canvas, violations, errors } = await open(page);
   await expect(canvas).toHaveAttribute("data-output", "stereogram");

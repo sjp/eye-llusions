@@ -204,6 +204,12 @@ h2 {
   transition: none;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .sheet {
+    transition: none;
+  }
+}
+
 .sheet-handle {
   display: grid;
   flex: none;
