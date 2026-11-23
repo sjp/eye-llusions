@@ -102,7 +102,10 @@ function useThumbnails(renderer: Renderer, list: { current: HTMLElement | null }
   return failed;
 }
 
-function Thumbnail({ sample, failed }: { sample: GallerySample; failed: boolean }) {
+type ThumbnailProps = { sample: GallerySample; failed: boolean; onView: () => void };
+
+/** A sample's picture; tapping it views the sample, as its View button does from the keyboard. */
+function Thumbnail({ sample, failed, onView }: ThumbnailProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const image = thumbnails.get(sample.id);
   const { width, height } = thumbnailSize(sample.recipe);
@@ -119,7 +122,7 @@ function Thumbnail({ sample, failed }: { sample: GallerySample; failed: boolean 
     }
   }, [image]);
   return (
-    <div class="gallery-thumbnail">
+    <div class="gallery-thumbnail" onClick={onView}>
       <canvas
         ref={ref}
         width={width}
@@ -169,7 +172,13 @@ export function Gallery({ renderer: given, focus, onView, onRemix, onBlank }: Pr
       <ul ref={list} class="gallery-grid" aria-label="Samples">
         {GALLERY.map((sample) => (
           <li key={sample.id} class="gallery-card" data-id={sample.id}>
-            <Thumbnail sample={sample} failed={failed.has(sample.id)} />
+            <Thumbnail
+              sample={sample}
+              failed={failed.has(sample.id)}
+              onView={() => {
+                onView(sample);
+              }}
+            />
             <div class="gallery-card-footer">
               <h2>{sample.title}</h2>
               <button

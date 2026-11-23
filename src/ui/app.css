@@ -958,6 +958,7 @@ h2 {
 
 .gallery-thumbnail {
   position: relative;
+  cursor: pointer;
 }
 
 .gallery-thumbnail canvas {

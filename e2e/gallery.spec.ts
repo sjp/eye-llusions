@@ -139,6 +139,15 @@ test("viewing a sample opens the viewer and leads back to the gallery", async ({
   await expect(page.getByRole("button", { name: "Start from blank" })).toBeVisible();
 });
 
+test("tapping a thumbnail views its sample", async ({ page }) => {
+  await openGallery(page);
+  await page.getByRole("img", { name: "Heart stereogram" }).click();
+  const viewer = page.getByRole("dialog", { name: "Viewer" });
+  await expect(viewer).toBeVisible();
+  await viewer.getByRole("button", { name: "Exit" }).click();
+  await expect(page.getByRole("button", { name: "View Heart" })).toBeFocused();
+});
+
 test("a file dropped on the gallery opens in Create", async ({ page, isMobile }) => {
   test.skip(isMobile, "Dragging files is a desktop gesture");
   await openGallery(page);

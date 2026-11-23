@@ -124,6 +124,13 @@ describe("the gallery", () => {
     });
   });
 
+  test("tapping a thumbnail views its sample", () => {
+    const { editor } = setup();
+    fireEvent.click(screen.getByRole("img", { name: `${GALLERY[1].title} stereogram` }));
+    expect(editor.recipe.value).toBe(GALLERY[1].recipe);
+    expect(screen.getByRole("dialog", { name: "Viewer" })).toBeTruthy();
+  });
+
   test("leaving the viewer focuses the View button that opened it", async () => {
     setup();
     const view = screen.getByRole("button", { name: `View ${GALLERY[2].title}` });
