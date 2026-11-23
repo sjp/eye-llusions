@@ -41,7 +41,19 @@ jobs:
         run: npm run test:perf -- --reporter=verbose --reporter=github-actions
       - run: npm run build
       - run: npx playwright install --with-deps chromium webkit
+      # Tests the dist/ build that gets deployed instead of building again.
       - run: npm run test:browser
+        env:
+          E2E_DIST: dist
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-results
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14
       - if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/configure-pages@v6
       - if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
