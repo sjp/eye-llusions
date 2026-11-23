@@ -76,6 +76,7 @@ test("closing the leave, share and save dialogs returns focus to the toolbar", a
 
   const gallery = page.getByRole("button", { name: "Gallery" });
   await gallery.click();
+  await expect(page.getByRole("button", { name: "Keep editing" })).toBeFocused();
   await page.getByRole("button", { name: "Keep editing" }).click();
   await expect(page.getByRole("dialog", { name: "Leave this scene?" })).toBeHidden();
   await expect(gallery).toBeFocused();
