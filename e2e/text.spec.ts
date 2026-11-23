@@ -1,7 +1,7 @@
 import { chromium, devices, webkit, type Page } from "@playwright/test";
 import { expect, test, watchContext } from "./guard.ts";
-import { readdirSync } from "node:fs";
 import { layerNames, openLayers, renders, settledPixels } from "./preview.ts";
+import { renderInWorker, workerUrl } from "./worker.ts";
 
 test("a text layer types live, undoes per burst and has distinct edge profiles", async ({
   page,
@@ -104,51 +104,16 @@ const WIDTH = 480;
 const HEIGHT = 270;
 
 /** Renders the recipe's depth map at a fixed size in the app's own worker. */
-async function renderDepth(page: Page, workerUrl: string): Promise<number[]> {
+async function renderDepth(page: Page): Promise<number[]> {
   await page.goto("./");
-  const depth = await page.evaluate(
-    async ([url, recipe, width, height]) => {
-      const worker = new Worker(url, { type: "module" });
-      const reply = await new Promise<MessageEvent>((resolve, reject) => {
-        worker.addEventListener("message", resolve);
-        worker.addEventListener("error", () => {
-          reject(new Error("worker failed"));
-        });
-        worker.postMessage(
-          {
-            requestId: 1,
-            recipe,
-            width,
-            height,
-            oversample: 1,
-            output: "depth",
-            assets: {},
-            assetIds: [],
-          },
-          [],
-        );
-      });
-      worker.terminate();
-      const response: unknown = reply.data;
-      if (typeof response !== "object" || response === null || !("image" in response)) {
-        throw new Error(JSON.stringify(response));
-      }
-      const image = response.image;
-      const context = new OffscreenCanvas(width, height).getContext("2d");
-      if (context === null) {
-        throw new Error("No 2D context");
-      }
-      if (image instanceof ImageData) {
-        context.putImageData(image, 0, 0);
-      } else if (image instanceof ImageBitmap) {
-        context.drawImage(image, 0, 0);
-      }
-      const { data } = context.getImageData(0, 0, width, height);
-      return Array.from(data.filter((_, i) => i % 4 === 0));
-    },
-    [workerUrl, TEXT_RECIPE, WIDTH, HEIGHT] as const,
-  );
-  return depth;
+  const pixels = await renderInWorker(page, await workerUrl(page), {
+    recipe: TEXT_RECIPE,
+    width: WIDTH,
+    height: HEIGHT,
+    oversample: 1,
+    output: "depth",
+  });
+  return pixels.filter((_, i) => i % 4 === 0);
 }
 
 test("text renders the same in desktop and mobile browsers", async ({ page }, testInfo) => {
@@ -156,10 +121,7 @@ test("text renders the same in desktop and mobile browsers", async ({ page }, te
     testInfo.project.name !== "desktop-chromium",
     "Compares every browser from one project",
   );
-  const worker = readdirSync("dist-e2e/assets").find((name) => /^worker-.*\.js$/.test(name));
-  expect(worker).toBeDefined();
-  const workerUrl = `assets/${String(worker)}`;
-  const reference = await renderDepth(page, workerUrl);
+  const reference = await renderDepth(page);
   const covered = reference.filter((value) => value > 0).length;
   expect(covered).toBeGreaterThan(WIDTH * HEIGHT * 0.05);
 
@@ -171,7 +133,7 @@ test("text renders the same in desktop and mobile browsers", async ({ page }, te
     try {
       const context = await browser.newContext({ ...device, baseURL: page.url() });
       const watched = await watchContext(context);
-      const depth = await renderDepth(await context.newPage(), workerUrl);
+      const depth = await renderDepth(await context.newPage());
       expect(watched.violations).toEqual([]);
       expect(watched.errors).toEqual([]);
       let total = 0;
