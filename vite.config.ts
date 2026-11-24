@@ -63,6 +63,9 @@ export const CACHE_DIR = fileURLToPath(new URL("node_modules/.vite", import.meta
  */
 const TEST_TIME = Date.UTC(2026, 2, 14, 15, 9, 26);
 
+/** Unit tests that need no DOM, run in Node rather than happy-dom. */
+const NODE_TESTS = ["src/core/**/*.test.ts", "src/state/**/*.test.ts"];
+
 /** Kept out of every Vitest run. scripts/ has its own `node --test` tests. */
 export const TEST_EXCLUDE = ["**/.claude/**", "e2e/**", "scripts/**"];
 
@@ -82,12 +85,32 @@ export default defineConfig({
   // Agent worktrees live under .claude/; keep their copies of the tests out of the run.
   // e2e/ is reserved for Playwright browser tests, and *.perf.test.ts holds the
   // frame-timing tests, run one file at a time by `npm run test:perf`.
-  // src/test/setup.ts puts every test on fake timers starting at TEST_TIME.
+  // src/test/fakeClock.ts puts every test on fake timers starting at TEST_TIME.
   test: {
     exclude: [...configDefaults.exclude, ...TEST_EXCLUDE, "**/*.perf.test.ts"],
-    environment: "happy-dom",
-    setupFiles: ["src/test/setup.ts"],
     fakeTimers: { now: TEST_TIME },
+    // The DOM-free core and state tests skip happy-dom, whose setup costs more than
+    // most of their tests.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "node",
+          include: NODE_TESTS,
+          environment: "node",
+          setupFiles: ["src/test/fakeClock.ts"],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "dom",
+          exclude: NODE_TESTS,
+          environment: "happy-dom",
+          setupFiles: ["src/test/fakeClock.ts", "src/test/cleanup.ts"],
+        },
+      },
+    ],
     // `npm run test:coverage` fails if the pure core or the state layer loses coverage. It
     // runs with a longer timeout, as instrumentation slows the heaviest tests several times.
     coverage: {
