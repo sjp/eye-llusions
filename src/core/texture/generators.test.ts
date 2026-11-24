@@ -43,21 +43,25 @@ const GENERATORS: ValueGenerator[] = [
 
 /**
  * Pearson correlation between values `lag` pixels apart along rows, averaged over the
- * rows of the sample.
+ * rows of the sample, as `[lag, correlation]` for each lag from `from` to `to`.
  */
-function autocorrelation(rows: readonly number[][], lag: number): number {
+function autocorrelations(rows: readonly number[][], from: number, to: number): [number, number][] {
   const all = rows.flat();
   const average = mean(all);
   const variance = mean(all.map((value) => (value - average) ** 2));
-  let sum = 0;
-  let count = 0;
-  for (const row of rows) {
-    for (let x = 0; x + lag < row.length; x++) {
-      sum += (row[x] - average) * (row[x + lag] - average);
-      count += 1;
+  const result: [number, number][] = [];
+  for (let lag = from; lag <= to; lag++) {
+    let sum = 0;
+    let count = 0;
+    for (const row of rows) {
+      for (let x = 0; x + lag < row.length; x++) {
+        sum += (row[x] - average) * (row[x + lag] - average);
+        count += 1;
+      }
     }
+    result.push([lag, sum / count / variance]);
   }
-  return sum / count / variance;
+  return result;
 }
 
 describe.each(GENERATORS)("$type", (generator) => {
@@ -75,9 +79,10 @@ describe.each(GENERATORS)("$type", (generator) => {
     );
     // Neighbouring pixels within a feature are alike; beyond two features they aren't.
     const feature = FEATURE_CELLS[generator.type] * cellSize;
-    for (let lag = 2 * feature; lag <= strip; lag++) {
-      expect(Math.abs(autocorrelation(rows, lag)), `lag ${String(lag)}`).toBeLessThan(0.1);
-    }
+    const correlated = autocorrelations(rows, 2 * feature, strip).filter(
+      ([, correlation]) => Math.abs(correlation) >= 0.1,
+    );
+    expect(correlated).toEqual([]);
   });
 
   test("is deterministic per seed", () => {
