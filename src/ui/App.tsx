@@ -46,8 +46,8 @@ type Dialog = "share" | "save" | "leave" | undefined;
 
 type Screen = "gallery" | "create";
 
-/** Below this width the file actions move into a menu so the toolbar fits. */
-const COMPACT_TOOLBAR = "(max-width: 409px)";
+/** Below this width the file actions move into a menu, leaving room for wider fonts on large phones. */
+const COMPACT_TOOLBAR = "(max-width: 449px)";
 
 export function App({
   editor: givenEditor,

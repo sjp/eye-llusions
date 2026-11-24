@@ -96,7 +96,7 @@ for (const width of [undefined, 375, 360, 320]) {
     expect(overflow).toBeLessThanOrEqual(0);
 
     const more = toolbar.getByRole("button", { name: "More" });
-    if ((page.viewportSize()?.width ?? 0) < 410) {
+    if ((page.viewportSize()?.width ?? 0) < 450) {
       await reachable(page, more);
       await more.click();
       for (const name of ["Open", "Save", "Share"]) {
