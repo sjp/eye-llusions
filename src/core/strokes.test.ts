@@ -96,8 +96,16 @@ describe("finishStroke", () => {
   });
 
   test("simplifies more coarsely when a stroke has too many points", () => {
-    const raw = Array.from({ length: 6000 }, (_, i) => [i / 6000, i % 2 === 0 ? 0.4 : 0.6]).flat();
-    const finished = finishStroke(raw, 1, 0.001);
+    // A fine zigzag just over the cap: the brush's own tolerance keeps nearly every
+    // point, so only a coarser pass brings it under. Simplifying a zigzag takes time
+    // that grows with the square of its length, so it is kept short.
+    const count = RECIPE_LIMITS.pointsPerStroke + 100;
+    const raw = Array.from({ length: count }, (_, i) => [
+      i / count,
+      0.5 + (i % 2 === 0 ? -1 : 1) * 0.0015,
+    ]).flat();
+    expect(simplifyPoints(raw, 1, 0.001).length / 2).toBeGreaterThan(RECIPE_LIMITS.pointsPerStroke);
+    const finished = finishStroke(raw, 1, 0.02);
     expect(finished.length / 2).toBeLessThanOrEqual(RECIPE_LIMITS.pointsPerStroke);
   });
 
