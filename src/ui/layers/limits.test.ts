@@ -173,11 +173,17 @@ describe("editor actions at the recipe's limits", () => {
   test.each([1, 2, 3])("keep every scene parseable (seed %i)", (seed) => {
     const random = createRandom(seed);
     const editor = new Editor(imagesShortOfTheLimit());
+    // Many actions change nothing, and a scene already checked needn't be checked again.
+    const checked = new WeakSet<Recipe>();
     const reached = { layers: false, points: false, area: false, assets: false };
     for (let step = 0; step < 300; step++) {
       pick(random, ACTIONS)?.(editor, random);
       editor.endEdit();
       const recipe: Recipe = editor.recipe.value;
+      if (checked.has(recipe)) {
+        continue;
+      }
+      checked.add(recipe);
       expect(() => parseRecipe(recipe), `after step ${String(step)}`).not.toThrow();
       reached.layers ||= recipe.layers.length === RECIPE_LIMITS.layers;
       const totals = drawingTotals(recipe);
